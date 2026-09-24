@@ -46,6 +46,25 @@ class SplitOutput(ExportRun):
         self.assertEqual(self.run_bot(count=150), 0, self.output)
         self.assertEqual(self.run_bot(count=150), 0, self.output)
         self.assertEqual([m['id'] for m in self.result()['messages']], list(range(1, 151)))
+        self.assertEqual(self.parts(), [])
+
+    def test_switching_to_parts_keeps_the_messages_listed_since(self):
+        self.run_bot(count=100)
+        self.assertEqual(self.run_bot(count=150, env={'JSON_FILE_PAGE_SIZE': 20000}), 0, self.output)
+        self.assertFalse(os.path.exists(self.path('result.json')))
+        self.assertEqual(self.run_bot(count=150, env={'JSON_FILE_PAGE_SIZE': 20000}), 0, self.output)
+        self.assertEqual([m['id'] for part in self.parts() for m in part['messages']], list(range(1, 151)))
+
+    def test_an_export_left_with_a_stale_result_json_reads_the_newer_parts(self):
+        self.run_bot(count=100)
+        with open(self.path('result.json'), encoding='utf-8') as f:
+            stale = f.read()
+        self.run_bot(count=150, env={'JSON_FILE_PAGE_SIZE': 20000})
+        with open(self.path('result.json'), 'w', encoding='utf-8') as f:
+            f.write(stale)
+        os.utime(self.path('result.json'), (1, 1))
+        self.assertEqual(self.run_bot(count=150, env={'JSON_FILE_PAGE_SIZE': 20000}), 0, self.output)
+        self.assertEqual([m['id'] for part in self.parts() for m in part['messages']], list(range(1, 151)))
 
 
 if __name__ == '__main__':

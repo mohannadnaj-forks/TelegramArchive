@@ -176,7 +176,10 @@ def load_existing_export(username: str) -> dict:
 
 
 def load_result_json(json_name: str) -> dict:
-    if os.path.exists(json_name):
+    # When both result.json and parts are present, the newer of the two is the export.
+    part1 = json_name.replace('result.json', 'result_part1.json')
+    parts_newer = os.path.exists(part1) and os.path.exists(json_name) and os.path.getmtime(part1) > os.path.getmtime(json_name)
+    if os.path.exists(json_name) and not parts_newer:
         try:
             with open(json_name, 'r', encoding='utf-8') as f:
                 data = json.load(f)
@@ -477,11 +480,17 @@ def write_export(chat_data: dict, json_name: str) -> None:
     chat_data['messages'].sort(key=lambda m: m['id'])
     if JSON_FILE_PAGE_SIZE:
         split_json_file(chat_data, json_name, JSON_FILE_PAGE_SIZE)
+        if os.path.exists(json_name):
+            os.remove(json_name)
         return
     tmp_name = f'{json_name}.tmp'
     with open(tmp_name, mode='w', encoding='utf-8') as f:
         json.dump(chat_data, f, indent=4, default=str)
     os.replace(tmp_name, json_name)
+    number = 1
+    while os.path.exists(json_name.replace('result.json', f'result_part{number}.json')):
+        os.remove(json_name.replace('result.json', f'result_part{number}.json'))
+        number += 1
 
 
 def generate_json_name(username: str, path: str = '') -> str:
