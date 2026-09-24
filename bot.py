@@ -773,15 +773,12 @@ async def main():
     async with app:
         print("\033[32mStarting...\033[0m")
 
+        # A positive id on the command line is a channel's id as exports record it, without the API's -100 prefix.
+        chat_ids = [int(f'-100{cid}') if isinstance(cid, int) and cid > 0 else cid for cid in CHAT_IDS]
         if EXPORT_ALL:
-            all_dialogs_id = await ChatExporter(app).get_ids()
-            CHAT_IDS.extend(all_dialogs_id)
+            chat_ids.extend(await ChatExporter(app).get_ids())
 
-        for cid in CHAT_IDS:
-            # when use telegram api, channels id have -100 prefix
-            if type(cid) == int and not str(cid).startswith('-100'):
-                cid = int(f'-100{cid}')
-
+        for cid in chat_ids:
             chat = await app.get_chat(cid)
             title = getattr(chat, 'title', None) or getattr(chat, 'first_name', 'Unknown')
             print(f"📋 Exporting: {title} (@{getattr(chat, 'username', None) or chat.id})")

@@ -36,6 +36,16 @@ class ExportAll(ExportRun):
         self.assertEqual([c['chat_id'] for c in self.calls('get_chat')], [-1001234])
         self.assertIn('Dialog: id=-1005678, title=A supergroup, type=SUPERGROUP, export=False', self.output)
 
+    def test_ids_from_the_dialog_list_are_used_as_they_are(self):
+        dialogs = [{'id': 42, 'type': 'PRIVATE', 'first_name': 'Pavel'}, {'id': -555, 'type': 'GROUP', 'title': 'A group'}]
+        env = {'CHAT_EXPORT_PERSONALS': 'True', 'CHAT_EXPORT_GROUPS': 'True'}
+        self.assertEqual(self.run_bot('--all', count=3, dialogs=dialogs, env=env), 0, self.output)
+        self.assertEqual([c['chat_id'] for c in self.calls('get_chat')], [42, -555])
+
+    def test_a_basic_group_id_on_the_command_line(self):
+        self.assertEqual(self.run_bot(chat='-555', count=3), 0, self.output)
+        self.assertEqual([c['chat_id'] for c in self.calls('get_chat')], [-555])
+
 
 class ExportFolders(ExportRun):
     def test_an_export_goes_to_chatexport_username_date(self):
