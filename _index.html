@@ -1,0 +1,2179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light dark">
+    <title>Telegram Archive</title>
+    <style>
+        :root {
+            --page: #f4f4f5;
+            --card: #ffffff;
+            --line: #e4e4e7;
+            --line-strong: #d4d4d8;
+            --text: #18181b;
+            --muted: #71717a;
+            --faint: #a1a1aa;
+            --accent: #2481cc;
+            --accent-text: #ffffff;
+            --accent-soft: rgba(36, 129, 204, 0.12);
+            --bar-video: #2481cc;
+            --bar-photo: #7fb8e6;
+            --bar-other: #c4dcf0;
+            --warn: #b45309;
+            --warn-soft: rgba(180, 83, 9, 0.1);
+            --media-bg: #0b0b0c;
+            --quote: #2481cc;
+            --code-bg: rgba(0, 0, 0, 0.05);
+            --shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 4px 16px rgba(0, 0, 0, 0.06);
+            --header-h: 60px;
+            --sidebar-w: 240px;
+            --feed-w: 620px;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root:not([data-theme="light"]) {
+                --page: #0e0e10;
+                --card: #1b1b1e;
+                --line: #2a2a2e;
+                --line-strong: #3a3a3f;
+                --text: #ececef;
+                --muted: #9d9da5;
+                --faint: #6c6c73;
+                --accent: #5ea9e8;
+                --accent-text: #0e0e10;
+                --accent-soft: rgba(94, 169, 232, 0.16);
+                --bar-video: #5ea9e8;
+                --bar-photo: #3b7bb0;
+                --bar-other: #2b4a63;
+                --warn: #f0a650;
+                --warn-soft: rgba(240, 166, 80, 0.12);
+                --quote: #5ea9e8;
+                --code-bg: rgba(255, 255, 255, 0.07);
+                --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 20px rgba(0, 0, 0, 0.35);
+            }
+        }
+
+        :root[data-theme="light"] { color-scheme: light; }
+
+        :root[data-theme="dark"] {
+            color-scheme: dark;
+            --page: #0e0e10;
+            --card: #1b1b1e;
+            --line: #2a2a2e;
+            --line-strong: #3a3a3f;
+            --text: #ececef;
+            --muted: #9d9da5;
+            --faint: #6c6c73;
+            --accent: #5ea9e8;
+            --accent-text: #0e0e10;
+            --accent-soft: rgba(94, 169, 232, 0.16);
+            --bar-video: #5ea9e8;
+            --bar-photo: #3b7bb0;
+            --bar-other: #2b4a63;
+            --warn: #f0a650;
+            --warn-soft: rgba(240, 166, 80, 0.12);
+            --quote: #5ea9e8;
+            --code-bg: rgba(255, 255, 255, 0.07);
+            --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 20px rgba(0, 0, 0, 0.35);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html { overflow-anchor: none; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans", "Noto Sans Arabic", Helvetica, Arial, sans-serif;
+            font-size: 15px;
+            line-height: 1.5;
+            background: var(--page);
+            color: var(--text);
+            -webkit-font-smoothing: antialiased;
+        }
+
+        button, input { font: inherit; color: inherit; }
+        a { color: var(--accent); text-decoration: none; }
+        a:hover { text-decoration: underline; }
+
+        .header {
+            position: fixed;
+            inset: 0 0 auto 0;
+            height: var(--header-h);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 0 16px;
+            background: color-mix(in srgb, var(--card) 88%, transparent);
+            backdrop-filter: saturate(1.4) blur(12px);
+            -webkit-backdrop-filter: saturate(1.4) blur(12px);
+            border-bottom: 1px solid var(--line);
+        }
+
+        .avatar {
+            flex: none;
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            display: grid;
+            place-items: center;
+            color: #fff;
+            font-weight: 600;
+            font-size: 15px;
+            letter-spacing: 0.02em;
+        }
+
+        .identity { min-width: 0; flex: 1; }
+        .to-start { cursor: pointer; }
+        .identity h1 {
+            font-size: 16px;
+            font-weight: 600;
+            line-height: 1.25;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .identity .meta {
+            font-size: 12.5px;
+            color: var(--muted);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .search-wrap { position: relative; flex: 0 1 320px; min-width: 0; }
+        .search {
+            width: 100%;
+            height: 36px;
+            padding: 0 12px 0 34px;
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            background: var(--page);
+            outline: none;
+        }
+        .search:focus { border-color: var(--accent); background: var(--card); }
+        .search-wrap svg {
+            position: absolute;
+            left: 11px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--faint);
+            pointer-events: none;
+        }
+
+        .icon-btn {
+            flex: none;
+            width: 36px;
+            height: 36px;
+            display: grid;
+            place-items: center;
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            background: transparent;
+            color: var(--muted);
+            cursor: pointer;
+        }
+        .icon-btn:hover { color: var(--text); background: var(--page); }
+        .timeline-btn { display: none; }
+
+        .sidebar {
+            position: fixed;
+            top: calc(var(--header-h) + 16px);
+            left: 16px;
+            max-height: calc(100vh - var(--header-h) - 32px);
+            width: var(--sidebar-w);
+            overflow-y: auto;
+            scrollbar-width: thin;
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            padding: 12px 10px;
+            z-index: 50;
+        }
+
+        .nav-summary { padding: 2px 6px 10px; border-bottom: 1px solid var(--line); margin-bottom: 8px; }
+        .nav-total { font-weight: 600; font-size: 14px; font-variant-numeric: tabular-nums; }
+        .nav-sub { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+        .nav-sub .warn { color: var(--warn); }
+
+        .nav-tools { display: grid; gap: 6px; padding: 0 6px 10px; border-bottom: 1px solid var(--line); margin-bottom: 6px; }
+        .nav-tools label { font-size: 11.5px; color: var(--muted); display: grid; gap: 2px; min-width: 0; }
+        .nav-tools input[type="date"] {
+            width: 100%;
+            min-width: 0;
+            height: 30px;
+            padding: 0 6px;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: var(--page);
+            font-size: 12.5px;
+            font-variant-numeric: tabular-nums;
+        }
+        .nav-goto { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 8px; }
+        .nav-goto .nav-clear { height: 30px; }
+        .nav-range { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 6px; }
+        .nav-check { display: flex !important; align-items: center; gap: 6px; font-size: 12px !important; cursor: pointer; }
+        .nav-check input { accent-color: var(--accent); }
+        .nav-clear {
+            justify-self: start;
+            border: none;
+            background: none;
+            color: var(--accent);
+            font-size: 12px;
+            cursor: pointer;
+            padding: 0;
+        }
+
+        .nav-year-row {
+            display: grid;
+            grid-template-columns: 12px 1fr auto;
+            align-items: center;
+            gap: 6px;
+            width: 100%;
+            padding: 6px 8px;
+            margin-top: 2px;
+            border: none;
+            border-radius: 8px;
+            background: none;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            text-align: left;
+        }
+        .nav-year-row:hover { background: var(--page); }
+        .nav-chevron { font-size: 9px; color: var(--faint); transition: transform 0.15s ease; }
+        .nav-year.open .nav-chevron { transform: rotate(90deg); }
+        .nav-year-now { display: none; color: var(--accent); font-weight: 500; }
+        .nav-year.current:not(.open) .nav-year-now { display: inline; }
+        .nav-year.current:not(.open) .nav-year-row { color: var(--accent); }
+        .nav-year-count { color: var(--muted); font-weight: 500; font-variant-numeric: tabular-nums; font-size: 12px; }
+        .nav-months { display: none; padding-bottom: 4px; }
+        .nav-year.open .nav-months { display: block; }
+
+        .nav-month {
+            display: grid;
+            grid-template-columns: 30px 1fr 40px;
+            align-items: center;
+            gap: 8px;
+            width: 100%;
+            padding: 3px 8px;
+            border: none;
+            border-radius: 6px;
+            background: none;
+            cursor: pointer;
+            font-size: 12.5px;
+            color: var(--muted);
+            text-align: left;
+        }
+        .nav-month:hover { background: var(--page); color: var(--text); }
+        .nav-month.active { background: var(--accent); color: var(--accent-text); }
+        .nav-month.empty, .nav-month.outside { cursor: default; color: var(--faint); opacity: 0.55; }
+        .nav-month.empty:hover, .nav-month.outside:hover { background: none; }
+        .nav-count { text-align: right; font-variant-numeric: tabular-nums; font-size: 12px; }
+        .nav-count .dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--warn); margin-right: 4px; vertical-align: 1px; }
+        .nav-month.active .nav-count .dot { background: var(--accent-text); }
+
+        .nav-bar { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; display: flex; }
+        .nav-bar span { height: 100%; }
+        .nav-bar .v { background: var(--bar-video); }
+        .nav-bar .p { background: var(--bar-photo); }
+        .nav-bar .o { background: var(--bar-other); }
+        .nav-month.active .nav-bar { background: rgba(255, 255, 255, 0.3); }
+        .nav-month.active .nav-bar span { background: var(--accent-text); opacity: 0.85; }
+
+        .nav-gap { padding: 4px 8px; font-size: 11.5px; color: var(--faint); font-style: italic; }
+
+        .main { padding: calc(var(--header-h) + 16px) 16px 40px; }
+        .feed { max-width: var(--feed-w); margin: 0 auto; }
+
+        @media (min-width: 1025px) {
+            .main { padding-left: calc(var(--sidebar-w) + 32px); }
+        }
+
+        .date-pill {
+            position: fixed;
+            top: calc(var(--header-h) + 10px);
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 40;
+            padding: 3px 12px;
+            border-radius: 999px;
+            font-size: 12.5px;
+            font-weight: 500;
+            color: var(--text);
+            background: color-mix(in srgb, var(--card) 85%, transparent);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border: 1px solid var(--line);
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            white-space: nowrap;
+        }
+        .date-pill.show { opacity: 1; }
+        @media (min-width: 1025px) {
+            .date-pill { left: calc(50% + (var(--sidebar-w) + 16px) / 2); }
+        }
+
+        .day { display: flex; justify-content: center; margin: 22px 0 12px; }
+        .day span {
+            padding: 3px 12px;
+            border-radius: 999px;
+            font-size: 12.5px;
+            font-weight: 500;
+            color: var(--muted);
+            background: var(--card);
+            border: 1px solid var(--line);
+        }
+
+        .post {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            overflow: hidden;
+            margin-bottom: 12px;
+        }
+        .post.flash { animation: flash 1.6s ease; }
+        @keyframes flash { 0%, 40% { box-shadow: 0 0 0 3px var(--accent); } 100% { box-shadow: 0 0 0 3px transparent; } }
+
+        .post-head { padding: 10px 14px 0; display: grid; gap: 6px; }
+        .post-head:last-child { padding-bottom: 10px; }
+        .post-author { font-weight: 600; font-size: 14px; color: var(--accent); }
+        .post-forward { font-size: 13px; color: var(--muted); }
+        .post-forward strong { color: var(--text); font-weight: 600; }
+        .reply {
+            display: block;
+            width: 100%;
+            text-align: left;
+            border: none;
+            border-left: 3px solid var(--quote);
+            background: var(--accent-soft);
+            border-radius: 6px;
+            padding: 4px 10px;
+            cursor: pointer;
+            font-size: 13px;
+            color: var(--muted);
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+        }
+        .reply b { color: var(--accent); font-weight: 600; margin-right: 6px; }
+
+        .post > .media, .post > .album { margin-top: 10px; }
+        .post > .media:first-child, .post > .album:first-child { margin-top: 0; }
+
+        .media {
+            position: relative;
+            background: var(--media-bg);
+            overflow: hidden;
+        }
+        .media.single { width: 100%; aspect-ratio: var(--ar, 16 / 9); max-height: min(72vh, 680px); }
+        .media img, .media video { display: block; width: 100%; height: 100%; object-fit: contain; }
+        .album .media img { object-fit: cover; }
+        .media.photo img { cursor: zoom-in; }
+        .media.sticker { background: none; width: 180px; aspect-ratio: 1; margin: 10px 14px 0; }
+
+        .album { display: grid; gap: 2px; grid-template-columns: repeat(6, minmax(0, 1fr)); background: var(--card); }
+        .album .media { aspect-ratio: 1; grid-column: span 2; }
+        .album .media.w3 { grid-column: span 3; aspect-ratio: 4 / 3; }
+        .album .media.w6 { grid-column: span 6; aspect-ratio: 16 / 9; }
+
+        .play {
+            position: absolute;
+            inset: 0;
+            display: grid;
+            place-items: center;
+            border: none;
+            background: none;
+            cursor: pointer;
+        }
+        .play i {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            display: grid;
+            place-items: center;
+            background: rgba(0, 0, 0, 0.55);
+            backdrop-filter: blur(4px);
+            color: #fff;
+            transition: transform 0.15s ease, background 0.15s ease;
+        }
+        .play:hover i { transform: scale(1.06); background: rgba(0, 0, 0, 0.7); }
+        .badge {
+            position: absolute;
+            left: 8px;
+            top: 8px;
+            padding: 1px 7px;
+            border-radius: 999px;
+            background: rgba(0, 0, 0, 0.55);
+            color: #fff;
+            font-size: 12px;
+            font-variant-numeric: tabular-nums;
+            pointer-events: none;
+        }
+
+        .missing {
+            display: grid;
+            place-items: center;
+            background: repeating-linear-gradient(135deg, var(--page) 0 10px, var(--card) 10px 20px);
+            border-top: 1px solid var(--line);
+            border-bottom: 1px solid var(--line);
+        }
+        .media.missing.single { aspect-ratio: var(--ar, 16 / 9); max-height: 240px; }
+        .missing-note { text-align: center; padding: 16px 20px; max-width: 420px; }
+        .missing-kind { font-weight: 600; font-size: 14px; }
+        .missing-why { font-size: 13px; color: var(--warn); margin-top: 2px; }
+        .album .missing-note { padding: 8px; }
+        .album .missing-kind { font-size: 12.5px; }
+        .album .missing-why { font-size: 11.5px; }
+
+        .file {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin: 10px 14px 0;
+            padding: 10px 12px;
+            border: 1px solid var(--line);
+            border-radius: 12px;
+        }
+        .file-icon {
+            flex: none;
+            width: 42px;
+            height: 42px;
+            border-radius: 10px;
+            display: grid;
+            place-items: center;
+            background: var(--accent);
+            color: var(--accent-text);
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        .file.missing-file .file-icon { background: var(--warn-soft); color: var(--warn); }
+        .file-body { min-width: 0; flex: 1; }
+        .file-name { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .file-meta { font-size: 12.5px; color: var(--muted); }
+        .file-meta .warn { color: var(--warn); }
+        .file audio { width: 100%; height: 32px; margin-top: 6px; }
+
+        .text {
+            padding: 10px 14px 0;
+            unicode-bidi: plaintext;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+        }
+        .text blockquote {
+            border-inline-start: 3px solid var(--quote);
+            padding-block: 2px;
+            padding-inline: 10px 0;
+            margin: 4px 0;
+            color: var(--text);
+        }
+        .text code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.9em; background: var(--code-bg); padding: 1px 4px; border-radius: 4px; }
+        .text pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; background: var(--code-bg); padding: 8px 10px; border-radius: 8px; margin: 4px 0; overflow-x: auto; white-space: pre; }
+        .text .tag { color: var(--accent); cursor: pointer; }
+        .text .tag:hover { text-decoration: underline; }
+        .text .spoiler { background: var(--text); color: transparent; border-radius: 3px; cursor: pointer; }
+        .text .spoiler.shown { background: none; color: inherit; }
+
+        .extra { padding: 10px 14px 0; font-size: 14px; }
+
+        .post-foot {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 10px;
+            padding: 6px 14px 10px;
+            font-size: 12px;
+            color: var(--faint);
+            font-variant-numeric: tabular-nums;
+        }
+        .post-foot a { color: inherit; }
+        .post-foot .views { display: inline-flex; align-items: center; gap: 4px; }
+        .post-foot a:hover { color: var(--accent); }
+
+        .post-empty {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 4px 14px;
+            margin-bottom: 12px;
+            font-size: 12.5px;
+            color: var(--faint);
+            font-style: italic;
+            border-left: 2px solid var(--line-strong);
+        }
+        .post-empty a { color: inherit; font-style: normal; font-variant-numeric: tabular-nums; }
+
+        .month-end {
+            display: grid;
+            justify-items: center;
+            gap: 4px;
+            margin: 28px 0 16px;
+            padding: 22px 16px;
+            text-align: center;
+            border: 1px dashed var(--line-strong);
+            border-radius: 14px;
+        }
+        .month-end-title { font-weight: 600; font-size: 15px; }
+        .month-end-sub { font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+        .month-end-next {
+            margin-top: 10px;
+            padding: 7px 16px;
+            border: none;
+            border-radius: 999px;
+            background: var(--accent);
+            color: var(--accent-text);
+            font-size: 13.5px;
+            font-weight: 500;
+            cursor: pointer;
+        }
+        .month-end.open { padding: 10px 16px; border: none; border-top: 1px solid var(--line); border-radius: 0; margin: 28px 0 8px; }
+        .month-end.open .month-end-title { font-size: 13px; color: var(--muted); font-weight: 500; }
+        .month-end.open .month-end-sub, .month-end.open .month-end-next { display: none; }
+
+        .edge {
+            text-align: center;
+            padding: 28px 16px;
+            color: var(--muted);
+            font-size: 13px;
+        }
+        .avatar img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block; }
+        .edge .avatar { width: 72px; height: 72px; font-size: 26px; margin: 0 auto 10px; }
+        .edge .description { max-width: 460px; margin: 8px auto 0; white-space: pre-wrap; color: var(--text); }
+        .edge-note { margin-top: 6px; }
+        .edge h2 { font-size: 18px; color: var(--text); font-weight: 600; }
+        .edge[hidden] { display: none; }
+
+        body.grid .feed { max-width: 1120px; }
+        .grid-month { font-weight: 600; font-size: 15px; margin: 22px 2px 10px; }
+        .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 4px; }
+        .tile {
+            position: relative;
+            aspect-ratio: 1;
+            border: none;
+            padding: 0;
+            border-radius: 6px;
+            overflow: hidden;
+            background: var(--media-bg);
+            cursor: pointer;
+        }
+        .tile img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 0.2s ease; }
+        .tile:hover img { transform: scale(1.03); }
+        .tile .badge { left: auto; right: 6px; top: 6px; }
+        .tile .count { position: absolute; left: 6px; top: 6px; padding: 1px 7px; border-radius: 999px; background: rgba(0, 0, 0, 0.55); color: #fff; font-size: 12px; }
+        .tile.missing { background: repeating-linear-gradient(135deg, var(--page) 0 10px, var(--card) 10px 20px); border: 1px solid var(--line); }
+        .tile .missing-kind { position: absolute; inset: auto 8px 8px; font-size: 12px; color: var(--warn); text-align: left; }
+        .tile .play-mark { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; color: #fff; opacity: 0.9; }
+
+        .status { text-align: center; padding: 60px 16px; color: var(--muted); }
+        .status.error { color: var(--warn); }
+
+        .results {
+            position: fixed;
+            top: calc(var(--header-h) + 8px);
+            right: 16px;
+            width: min(560px, calc(100vw - 32px));
+            max-height: calc(100vh - var(--header-h) - 24px);
+            overflow-y: auto;
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            box-shadow: var(--shadow);
+            z-index: 120;
+        }
+        .results[hidden] { display: none; }
+        .results-head { position: sticky; top: 0; background: var(--card); padding: 10px 14px; font-size: 12.5px; color: var(--muted); border-bottom: 1px solid var(--line); }
+        .result {
+            display: block;
+            width: 100%;
+            text-align: left;
+            border: none;
+            background: none;
+            padding: 10px 14px;
+            border-bottom: 1px solid var(--line);
+            cursor: pointer;
+        }
+        .result:hover, .result.sel { background: var(--page); }
+        .result-date { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+        .result-text { font-size: 13.5px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+        .results-more { display: block; width: 100%; border: none; background: none; padding: 12px 14px; color: var(--accent); font: inherit; font-size: 13px; cursor: pointer; }
+        .results-more:hover { background: var(--page); }
+        .results-more[hidden] { display: none; }
+        .result mark { background: var(--accent-soft); color: var(--accent); border-radius: 3px; padding: 0 1px; }
+
+        .lightbox {
+            position: fixed;
+            inset: 0;
+            z-index: 300;
+            background: rgba(0, 0, 0, 0.92);
+            display: grid;
+            place-items: center;
+        }
+        .lightbox[hidden] { display: none; }
+        .lightbox img, .lightbox video { max-width: calc(100vw - 120px); max-height: calc(100vh - 80px); object-fit: contain; }
+        .lightbox [hidden] { display: none; }
+        .lb-btn {
+            position: absolute;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            border: none;
+            background: rgba(255, 255, 255, 0.12);
+            color: #fff;
+            cursor: pointer;
+            display: grid;
+            place-items: center;
+            font-size: 20px;
+        }
+        .lb-btn:hover { background: rgba(255, 255, 255, 0.22); }
+        .lb-close { top: 16px; right: 16px; }
+        .lb-prev { left: 16px; top: 50%; transform: translateY(-50%); }
+        .lb-next { right: 16px; top: 50%; transform: translateY(-50%); }
+        .lb-count { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); color: rgba(255, 255, 255, 0.7); font-size: 13px; }
+
+        .scrim { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.35); z-index: 90; }
+        .scrim[hidden] { display: none; }
+
+        @media (max-width: 1024px) {
+            .timeline-btn { display: grid; }
+            .sidebar {
+                top: var(--header-h);
+                left: 0;
+                bottom: 0;
+                border-radius: 0 14px 14px 0;
+                border-left: none;
+                transform: translateX(-105%);
+                transition: transform 0.2s ease;
+                z-index: 95;
+                box-shadow: var(--shadow);
+            }
+            .sidebar.open { transform: none; }
+        }
+
+        @media (max-width: 640px) {
+            .main { padding-left: 0; padding-right: 0; }
+            .post { border-radius: 0; border-left: none; border-right: none; }
+            .identity .meta { display: none; }
+            .identity { min-width: 72px; }
+            .identity h1 { font-size: 14.5px; }
+            .search-wrap { flex: 1 1 120px; }
+            .header { gap: 8px; padding: 0 10px; }
+            .avatar { width: 32px; height: 32px; font-size: 13px; }
+            .lightbox img, .lightbox video { max-width: 100vw; }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="avatar to-start" id="avatar" title="Back to the first message"></div>
+        <div class="identity to-start" role="button" tabindex="0" title="Back to the first message">
+            <h1 id="chat-name">Telegram Archive</h1>
+            <div class="meta" id="chat-meta"></div>
+        </div>
+        <div class="search-wrap">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            <input class="search" id="search" type="search" placeholder="Search" autocomplete="off" spellcheck="false" aria-label="Search the archive">
+        </div>
+        <button class="icon-btn timeline-btn" id="timeline-btn" title="Timeline" aria-label="Timeline">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>
+        </button>
+        <button class="icon-btn" id="view-btn"></button>
+        <button class="icon-btn" id="theme-btn" aria-label="Theme"></button>
+    </header>
+
+    <nav class="sidebar" id="sidebar" aria-label="Timeline"></nav>
+    <div class="scrim" id="scrim" hidden></div>
+
+    <main class="main">
+        <div class="feed">
+            <div class="edge" id="feed-start" hidden></div>
+            <div id="feed"><div class="status">Loading…</div></div>
+            <div class="edge" id="feed-end" hidden></div>
+        </div>
+    </main>
+
+    <div class="date-pill" id="date-pill"></div>
+    <div class="results" id="results" hidden></div>
+    <div class="lightbox" id="lightbox" hidden>
+        <img id="lb-img" alt="">
+        <video id="lb-video" controls playsinline preload="none" hidden></video>
+        <button class="lb-btn lb-close" id="lb-close" aria-label="Close">✕</button>
+        <button class="lb-btn lb-prev" id="lb-prev" aria-label="Previous">‹</button>
+        <button class="lb-btn lb-next" id="lb-next" aria-label="Next">›</button>
+        <div class="lb-count" id="lb-count"></div>
+    </div>
+
+    <script>
+        let INDEX = null;
+        const pendingChunks = new Map();
+        let searchRowsReady = null;
+        function archiveIndex(data) { INDEX = data; }
+        function archiveChunk(name, records) {
+            const pending = pendingChunks.get(name);
+            if (pending) pending.resolve(records);
+        }
+        function archiveSearch(rows) { if (searchRowsReady) searchRowsReady(rows); }
+    </script>
+    <script src="data/index.js"></script>
+    <script>
+        'use strict';
+
+        const PAGE_SIZE = 40;
+        const MAX_PAGES = 7;
+        const MARGIN = 1600;
+        const MAX_CHUNKS = 8;
+        const SEARCH_PAGE = 300;
+        const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+        function h(tag, attrs, ...children) {
+            const el = document.createElement(tag);
+            for (const [key, value] of Object.entries(attrs || {})) {
+                if (value == null || value === false) continue;
+                if (key === 'class') el.className = value;
+                else if (key === 'text') el.textContent = value;
+                else if (key === 'style') el.style.cssText = value;
+                else if (key.startsWith('on')) el.addEventListener(key.slice(2), value);
+                else el.setAttribute(key, value === true ? '' : value);
+            }
+            for (const child of children.flat()) {
+                if (child != null && child !== false) el.append(child);
+            }
+            return el;
+        }
+
+        const $ = id => document.getElementById(id);
+
+        // ---- formatting
+
+        function parseLocal(s) {
+            const [d, t = '00:00:00'] = s.split('T');
+            const [y, m, day] = d.split('-').map(Number);
+            const [hh, mm, ss] = t.split(':').map(Number);
+            return new Date(y, m - 1, day, hh || 0, mm || 0, ss || 0);
+        }
+
+        function fmtSize(bytes) {
+            if (!bytes && bytes !== 0) return '';
+            const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+            let i = 0;
+            while (bytes >= 1024 && i < units.length - 1) { bytes /= 1024; i++; }
+            return (i >= 3 ? bytes.toFixed(1).replace(/\.0$/, '') : Math.round(bytes)) + ' ' + units[i];
+        }
+
+        function fmtDuration(seconds) {
+            seconds = Math.round(seconds || 0);
+            const hrs = Math.floor(seconds / 3600);
+            const mins = Math.floor(seconds % 3600 / 60);
+            const secs = String(seconds % 60).padStart(2, '0');
+            return hrs ? `${hrs}:${String(mins).padStart(2, '0')}:${secs}` : `${mins}:${secs}`;
+        }
+
+        const fmtNumber = n => n.toLocaleString();
+        const fmtCount = (n, one, many) => fmtNumber(n) + ' ' + (n === 1 ? one : many);
+        const fmtCompact = n => new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(n);
+        const fmtDay = d => d.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+        const fmtShortDay = d => d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+        const fmtTime = d => d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+        const monthLabel = key => MONTHS[Number(key.slice(5, 7)) - 1] + ' ' + key.slice(0, 4);
+
+        function fmtAge(d) {
+            const days = (Date.now() - d.getTime()) / 86400000;
+            const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
+            if (days < 1) return rtf.format(-Math.round(days * 24), 'hour');
+            if (days < 30) return rtf.format(-Math.round(days), 'day');
+            if (days < 365) return rtf.format(-Math.round(days / 30.44), 'month');
+            return rtf.format(-Math.round(days / 365.25), 'year');
+        }
+
+        function initials(name) {
+            const words = (name || '?').replace(/[^\p{L}\p{N}\s]/gu, '').trim().split(/\s+/).filter(Boolean);
+            return ((words[0] || '?')[0] + (words.length > 1 ? words[1][0] : '')).toUpperCase();
+        }
+
+        function avatarColor(id) {
+            const colors = ['#e17076', '#eda86c', '#a695e7', '#7bc862', '#6ec9cb', '#65aadd', '#ee7aae'];
+            let n = 0;
+            for (const c of String(id)) n = (n * 31 + c.charCodeAt(0)) >>> 0;
+            return colors[n % colors.length];
+        }
+
+        // ---- adapter: result.json record -> what the page renders
+
+        const KIND_BY_TYPE = {
+            video_file: 'video', animation: 'animation', video_message: 'round',
+            sticker: 'sticker', voice_message: 'voice', audio_file: 'audio',
+        };
+        const KIND_LABEL = {
+            photo: 'Photo', video: 'Video', animation: 'GIF', round: 'Video message', sticker: 'Sticker',
+            voice: 'Voice message', audio: 'Audio', document: 'File',
+        };
+
+        function textOf(value) {
+            if (!value) return { plain: '', entities: [] };
+            if (typeof value === 'string') return { plain: value, entities: [] };
+            const last = value[value.length - 1];
+            const plain = typeof last === 'string' ? last : '';
+            const entities = [];
+            let from = 0;
+            for (const e of value.slice(0, -1)) {
+                if (!e || typeof e !== 'object' || !e.text) continue;
+                let start = typeof e.offset === 'number' ? e.offset : plain.indexOf(e.text, from);
+                if (start < 0) start = plain.indexOf(e.text);
+                if (start < 0) continue;
+                const length = typeof e.length === 'number' ? e.length : e.text.length;
+                entities.push({ type: e.type, start, end: start + length, href: e.href || null });
+                from = start;
+            }
+            return { plain, entities };
+        }
+
+        function fromTelegram(r) {
+            const status = r.file_status || null;
+            const media = [];
+            if (status || r.photo || r.file) {
+                const kind = r.photo ? 'photo' : (KIND_BY_TYPE[r.media_type] || 'document');
+                const ok = !status || status.state === 'downloaded';
+                const path = ok ? (r.photo || r.file) : null;
+                const thumb = ok && r.thumbnail && r.thumbnail !== r.file && /\.(jpe?g|png|webp)$/i.test(r.thumbnail) ? r.thumbnail : null;
+                media.push({
+                    kind, path, thumb,
+                    width: r.width || null, height: r.height || null,
+                    duration: r.duration_seconds || null,
+                    size: status && status.size || null,
+                    mime: r.mime_type || null,
+                    title: [r.performer, r.title].filter(Boolean).join(' – ') || null,
+                    name: path ? path.split('/').pop() : null,
+                    missing: ok ? null : status,
+                });
+            }
+            return {
+                id: r.id,
+                date: parseLocal(r.date),
+                dayKey: r.date.slice(0, 10),
+                monthKey: r.date.slice(0, 7),
+                ts: r.date_unixtime,
+                author: r.from || '',
+                forwardedFrom: r.forwarded_from || null,
+                replyTo: r.reply_to_message_id || null,
+                text: textOf(r.caption !== undefined ? r.caption : r.text),
+                media,
+                location: r.location_information || null,
+                contact: r.contact_information || null,
+                groupId: r.media_group_id || null,
+                views: typeof r.views === 'number' ? r.views : null,
+            };
+        }
+
+        function groupPosts(items) {
+            const posts = [];
+            const albums = new Map();
+            let current = null;
+            for (const item of items) {
+                let post = null;
+                if (item.media.length && item.groupId) post = albums.get(item.groupId) || null;
+                else if (item.media.length && current && current.media.length && !current.first.groupId
+                    && item.ts === current.last.ts && !(item.text.plain && current.text.plain)) post = current;
+                if (post && post.items.length < 10) {
+                    post.items.push(item);
+                    post.media.push(...item.media);
+                    if (!post.text.plain) post.text = item.text;
+                    post.last = item;
+                } else {
+                    current = { id: item.id, items: [item], media: [...item.media], text: item.text, first: item, last: item };
+                    posts.push(current);
+                    if (item.groupId && item.media.length) albums.set(item.groupId, current);
+                }
+            }
+            return posts;
+        }
+
+        // ---- data loading
+
+        const CHUNKS = [];
+        const chunkCache = new Map();
+
+        function loadScript(src) {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = src;
+                script.onload = () => { script.remove(); resolve(); };
+                script.onerror = () => { script.remove(); reject(new Error('Could not load ' + src)); };
+                document.head.append(script);
+            });
+        }
+
+        function loadChunk(ci) {
+            const meta = CHUNKS[ci];
+            const cached = chunkCache.get(meta.name);
+            if (cached) {
+                chunkCache.delete(meta.name);
+                chunkCache.set(meta.name, cached);
+                return Promise.resolve(cached);
+            }
+            if (pendingChunks.has(meta.name)) return pendingChunks.get(meta.name).promise;
+            const pending = {};
+            pending.promise = new Promise((resolve, reject) => {
+                pending.resolve = records => {
+                    const items = records.map(fromTelegram);
+                    const chunk = { ci, posts: groupPosts(items), byId: new Map(), pages: null, version: -1 };
+                    for (const post of chunk.posts) for (const item of post.items) chunk.byId.set(item.id, post);
+                    chunkCache.set(meta.name, chunk);
+                    pendingChunks.delete(meta.name);
+                    evictChunks();
+                    resolve(chunk);
+                };
+                loadScript('data/' + encodeURIComponent(meta.name) + '.js').catch(err => {
+                    pendingChunks.delete(meta.name);
+                    reject(err);
+                });
+            });
+            pendingChunks.set(meta.name, pending);
+            return pending.promise;
+        }
+
+        function evictChunks() {
+            if (chunkCache.size <= MAX_CHUNKS) return;
+            const inUse = new Set(pages.map(p => CHUNKS[p.ci].name));
+            for (const name of chunkCache.keys()) {
+                if (chunkCache.size <= MAX_CHUNKS) break;
+                if (!inUse.has(name)) chunkCache.delete(name);
+            }
+        }
+
+        function findLoaded(id) {
+            for (const chunk of chunkCache.values()) {
+                const post = chunk.byId.get(id);
+                if (post) return post;
+            }
+            return null;
+        }
+
+        // ---- filter and pages
+
+        const filter = { from: '', to: '', missing: false };
+        let view = 'feed';
+        try { if (localStorage.getItem('tg-archive-view') === 'grid') view = 'grid'; } catch (e) {}
+        let filterVersion = 0;
+
+        function chunkSkipped(meta) {
+            if (filter.from && meta.last_date.slice(0, 10) < filter.from) return true;
+            if (filter.to && meta.first_date.slice(0, 10) > filter.to) return true;
+            if (filter.missing && !meta.missing) return true;
+            return false;
+        }
+
+        function postVisible(post) {
+            if (view === 'grid' && !post.media.some(m => VISUAL.has(m.kind))) return false;
+            if (filter.from && post.first.dayKey < filter.from) return false;
+            if (filter.to && post.first.dayKey > filter.to) return false;
+            if (filter.missing && !post.media.some(m => m.missing)) return false;
+            return true;
+        }
+
+        function pagesOf(chunk) {
+            if (chunk.version !== filterVersion) {
+                const visible = chunk.posts.filter(postVisible);
+                chunk.pages = [];
+                for (let i = 0; i < visible.length; i += PAGE_SIZE) chunk.pages.push(visible.slice(i, i + PAGE_SIZE));
+                chunk.version = filterVersion;
+            }
+            return chunk.pages;
+        }
+
+        async function nextRef(ref) {
+            if (ref.pi + 1 < pagesOf(ref.chunk).length) return { ci: ref.ci, pi: ref.pi + 1, chunk: ref.chunk };
+            for (let ci = ref.ci + 1; ci < CHUNKS.length; ci++) {
+                if (chunkSkipped(CHUNKS[ci])) continue;
+                const chunk = await loadChunk(ci);
+                if (pagesOf(chunk).length) return { ci, pi: 0, chunk };
+            }
+            return null;
+        }
+
+        async function prevRef(ref) {
+            if (ref.pi > 0) return { ci: ref.ci, pi: ref.pi - 1, chunk: ref.chunk };
+            for (let ci = ref.ci - 1; ci >= 0; ci--) {
+                if (chunkSkipped(CHUNKS[ci])) continue;
+                const chunk = await loadChunk(ci);
+                const count = pagesOf(chunk).length;
+                if (count) return { ci, pi: count - 1, chunk };
+            }
+            return null;
+        }
+
+        // ---- rendering: text
+
+        const WRAP_ORDER = { bold: 0, italic: 0, underline: 0, strikethrough: 0, code: 1, spoiler: 2, hashtag: 3, cashtag: 3, mention: 3, text_mention: 3, bot_command: 3, email: 4, phone_number: 4, link: 4, text_link: 4 };
+
+        function safeHref(url) {
+            if (!url) return null;
+            if (/^(https?:|tg:|mailto:)/i.test(url)) return url;
+            if (/^[\w-]+(\.[\w-]+)+/.test(url)) return 'https://' + url;
+            return null;
+        }
+
+        function wrapEntity(entity, node, covered, linked) {
+            const tagged = (tag, attrs) => h(tag, attrs, node);
+            switch (entity.type) {
+                case 'bold': return tagged('strong');
+                case 'italic': return tagged('em');
+                case 'underline': return tagged('u');
+                case 'strikethrough': return tagged('s');
+                case 'code': return tagged('code');
+                case 'spoiler': return tagged('span', { class: 'spoiler', title: 'Show spoiler' });
+                case 'hashtag':
+                case 'cashtag':
+                    return linked ? node : tagged('span', { class: 'tag', 'data-q': covered, role: 'button' });
+                case 'mention': {
+                    const href = /^@\w{4,}$/.test(covered) ? 'https://t.me/' + covered.slice(1) : null;
+                    return linked || !href ? node : tagged('a', { href, target: '_blank', rel: 'noopener noreferrer' });
+                }
+                case 'email': return linked ? node : tagged('a', { href: 'mailto:' + covered });
+                case 'link':
+                case 'text_link': {
+                    const href = safeHref(entity.href || covered);
+                    return linked || !href ? node : tagged('a', { href, target: '_blank', rel: 'noopener noreferrer' });
+                }
+                default: return node;
+            }
+        }
+
+        function inlineRun(text, from, to) {
+            const entities = text.entities.filter(e => e.type !== 'blockquote' && e.type !== 'pre' && e.end > from && e.start < to);
+            const cuts = new Set([from, to]);
+            for (const e of entities) { cuts.add(Math.max(e.start, from)); cuts.add(Math.min(e.end, to)); }
+            const points = [...cuts].sort((a, b) => a - b);
+            const out = [];
+            for (let i = 0; i < points.length - 1; i++) {
+                const a = points[i], b = points[i + 1];
+                let node = document.createTextNode(text.plain.slice(a, b));
+                const active = entities.filter(e => e.start <= a && e.end >= b)
+                    .sort((x, y) => (WRAP_ORDER[x.type] ?? 0) - (WRAP_ORDER[y.type] ?? 0));
+                let linked = false;
+                for (const e of active) {
+                    node = wrapEntity(e, node, text.plain.slice(e.start, e.end), linked);
+                    if (node.tagName === 'A' || (node.classList && node.classList.contains('tag'))) linked = true;
+                }
+                out.push(node);
+            }
+            return out;
+        }
+
+        function renderText(text) {
+            const el = h('div', { class: 'text', dir: 'auto' });
+            const blocks = text.entities.filter(e => e.type === 'blockquote' || e.type === 'pre').sort((a, b) => a.start - b.start);
+            let pos = 0;
+            for (const block of blocks) {
+                if (block.start < pos) continue;
+                if (block.start > pos) el.append(...inlineRun(text, pos, block.start));
+                let end = block.end;
+                const box = h(block.type === 'pre' ? 'pre' : 'blockquote', { dir: 'auto' }, inlineRun(text, block.start, end));
+                el.append(box);
+                if (text.plain[end] === '\n') end++;
+                pos = end;
+            }
+            if (pos < text.plain.length) el.append(...inlineRun(text, pos, text.plain.length));
+            return el;
+        }
+
+        // ---- rendering: media
+
+        const ICONS = {
+            play: '<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>',
+        };
+
+        function missingReason(status) {
+            switch (status.state) {
+                case 'too_large': return `Larger than this export's ${fmtSize(status.limit)} per-file limit`;
+                case 'total_limit': return `Left out when the export reached its ${fmtSize(status.limit)} total`;
+                case 'disabled': {
+                    const what = (status.setting || '').replace(/^MEDIA_EXPORT_/, '').replace(/_/g, ' ').toLowerCase() || 'this kind of file';
+                    return `Not downloaded: ${what} were switched off for this export`;
+                }
+                case 'failed': return 'Download failed' + (status.error ? ': ' + status.error : '');
+                default: return 'Not in this export';
+            }
+        }
+
+        function kindLine(m) {
+            return [KIND_LABEL[m.kind], m.duration ? fmtDuration(m.duration) : null, m.size ? fmtSize(m.size) : null].filter(Boolean).join(' · ');
+        }
+
+        function aspect(m) {
+            return m.width && m.height ? `--ar: ${m.width} / ${m.height}` : null;
+        }
+
+        let activeVideo = null;
+        const videoObserver = new IntersectionObserver(entries => {
+            for (const entry of entries) {
+                if (!entry.isIntersecting && !entry.target.paused) entry.target.pause();
+            }
+        }, { threshold: 0.2 });
+
+        function stopActiveVideo() {
+            if (!activeVideo) return;
+            const { video, restore } = activeVideo;
+            activeVideo = null;
+            videoObserver.unobserve(video);
+            video.pause();
+            video.removeAttribute('src');
+            video.load();
+            restore();
+        }
+
+        function playVideo(box, m) {
+            stopActiveVideo();
+            const saved = [...box.childNodes];
+            const video = h('video', { src: m.path, controls: true, autoplay: true, playsinline: true, preload: 'none' });
+            if (m.kind === 'animation') { video.loop = true; video.muted = true; }
+            box.replaceChildren(video);
+            videoObserver.observe(video);
+            activeVideo = { video, restore: () => box.replaceChildren(...saved) };
+        }
+
+        function renderMediaBox(m, single) {
+            const cls = 'media ' + m.kind + (single ? ' single' : '');
+            if (m.missing) {
+                return h('div', { class: 'media missing' + (single ? ' single' : ''), style: single ? aspect(m) : null },
+                    h('div', { class: 'missing-note' },
+                        h('div', { class: 'missing-kind', text: kindLine(m) }),
+                        h('div', { class: 'missing-why', text: missingReason(m.missing) })));
+            }
+            if (m.kind === 'photo') {
+                return h('div', { class: cls, style: single ? aspect(m) : null },
+                    h('img', { src: m.path, loading: 'lazy', decoding: 'async', width: m.width, height: m.height, alt: '', 'data-full': m.path }));
+            }
+            if (m.kind === 'sticker') {
+                return h('div', { class: 'media sticker' },
+                    h('img', { src: m.path, loading: 'lazy', decoding: 'async', alt: 'Sticker' }));
+            }
+            const box = h('div', { class: cls, style: single ? aspect(m) : null, 'data-video': single ? null : m.path, 'data-kind': m.kind });
+            if (m.thumb) box.append(h('img', { src: m.thumb, loading: 'lazy', decoding: 'async', width: m.width, height: m.height, alt: '' }));
+            if (m.duration) box.append(h('span', { class: 'badge', text: m.kind === 'animation' ? 'GIF' : fmtDuration(m.duration) }));
+            const button = h('button', { class: 'play', 'aria-label': 'Play ' + KIND_LABEL[m.kind].toLowerCase() }, h('i'));
+            button.firstChild.innerHTML = ICONS.play;
+            button.addEventListener('click', () => single ? playVideo(box, m) : openLightbox(box, [...box.parentNode.querySelectorAll('img[data-full], [data-video]')]));
+            box.append(button);
+            return box;
+        }
+
+        function renderFile(m) {
+            const ext = m.name && m.name.includes('.') ? m.name.split('.').pop().slice(0, 4) : (m.kind === 'voice' ? 'ogg' : 'file');
+            const meta = [KIND_LABEL[m.kind], m.duration ? fmtDuration(m.duration) : null, m.size ? fmtSize(m.size) : null].filter(Boolean).join(' · ');
+            const name = m.title || m.name || KIND_LABEL[m.kind];
+            const body = h('div', { class: 'file-body' },
+                m.path ? h('a', { class: 'file-name', href: m.path, target: '_blank', text: name, title: name }) : h('div', { class: 'file-name', text: name }),
+                h('div', { class: 'file-meta' }, meta, m.missing ? h('div', { class: 'warn', text: missingReason(m.missing) }) : null));
+            if (m.path && (m.kind === 'voice' || m.kind === 'audio')) body.append(h('audio', { src: m.path, controls: true, preload: 'none' }));
+            return h('div', { class: 'file' + (m.missing ? ' missing-file' : '') }, h('div', { class: 'file-icon', text: ext }), body);
+        }
+
+        const VISUAL = new Set(['photo', 'video', 'animation', 'round', 'sticker']);
+
+        function renderMedia(post) {
+            const visual = post.media.filter(m => VISUAL.has(m.kind));
+            const files = post.media.filter(m => !VISUAL.has(m.kind));
+            const out = [];
+            if (visual.length === 1) out.push(renderMediaBox(visual[0], true));
+            else if (visual.length > 1) {
+                const n = visual.length;
+                const spans = visual.map(() => 2);
+                if (n === 2 || n === 4) spans.fill(3);
+                else if (n % 3 === 1) spans[0] = 6;
+                else if (n % 3 === 2) spans[0] = spans[1] = 3;
+                out.push(h('div', { class: 'album' }, visual.map((m, i) => {
+                    const box = renderMediaBox(m, false);
+                    if (spans[i] !== 2) box.classList.add('w' + spans[i]);
+                    return box;
+                })));
+            }
+            for (const m of files) out.push(renderFile(m));
+            return out;
+        }
+
+        // ---- rendering: posts and pages
+
+        const postOf = new WeakMap();
+        let showAuthor = false;
+
+        function isEmptyPost(post) {
+            return !post.media.length && !post.text.plain && !post.first.location && !post.first.contact;
+        }
+
+        function timeLink(post) {
+            const d = post.first.date;
+            return h('a', { href: '#' + post.id, text: fmtTime(d), title: fmtDay(d) + ', ' + fmtTime(d) + ' · ' + fmtAge(d) });
+        }
+
+        function renderReply(id) {
+            const target = findLoaded(id);
+            let label = 'an earlier message';
+            if (target) {
+                label = target.text.plain.replace(/\s+/g, ' ').trim().slice(0, 120)
+                    || (target.media[0] ? KIND_LABEL[target.media[0].kind] : 'Message');
+            }
+            return h('button', { class: 'reply', dir: 'auto', onclick: () => openMessage(id) },
+                h('b', { text: 'Reply' }), label);
+        }
+
+        function renderPost(post) {
+            const first = post.first;
+            if (isEmptyPost(post)) {
+                const el = h('div', { class: 'post-empty', 'data-id': post.id },
+                    h('span', { text: 'Message not recorded in this export' }), timeLink(post));
+                postOf.set(el, post);
+                return el;
+            }
+            const card = h('article', { class: 'post', 'data-id': post.id });
+            const head = [];
+            if (showAuthor && first.author) head.push(h('div', { class: 'post-author', dir: 'auto', text: first.author }));
+            if (first.forwardedFrom) head.push(h('div', { class: 'post-forward', dir: 'auto' }, 'Forwarded from ', h('strong', { text: first.forwardedFrom })));
+            if (first.replyTo) head.push(renderReply(first.replyTo));
+            if (head.length) card.append(h('div', { class: 'post-head' }, head));
+            card.append(...renderMedia(post));
+            if (first.location) {
+                const { latitude, longitude } = first.location;
+                card.append(h('div', { class: 'extra' }, '📍 ', h('a', {
+                    href: `https://www.openstreetmap.org/?mlat=${latitude}&mlon=${longitude}#map=15/${latitude}/${longitude}`,
+                    target: '_blank', rel: 'noopener noreferrer', text: `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`,
+                })));
+            }
+            if (first.contact) {
+                const c = first.contact;
+                card.append(h('div', { class: 'extra', text: `👤 ${[c.fist_name, c.last_name].filter(Boolean).join(' ')} · ${c.phone_number}` }));
+            }
+            if (post.text.plain) card.append(renderText(post.text));
+            const foot = h('div', { class: 'post-foot' });
+            const views = Math.max(...post.items.map(i => i.views || 0));
+            if (views) foot.append(h('span', { class: 'views', title: fmtNumber(views) + ' views', text: fmtCompact(views) + ' views' }));
+            const username = INDEX.chat && INDEX.chat.username;
+            if (username) foot.append(h('a', { href: `https://t.me/${encodeURIComponent(username)}/${post.id}`, target: '_blank', rel: 'noopener noreferrer', title: 'Open in Telegram', text: 't.me' }));
+            foot.append(timeLink(post));
+            card.append(foot);
+            postOf.set(card, post);
+            return card;
+        }
+
+        function dayDivider(d) {
+            return h('div', { class: 'day' }, h('span', { text: fmtDay(d) }));
+        }
+
+        function renderTile(post) {
+            const m = post.media.find(x => VISUAL.has(x.kind));
+            const tile = h('button', { class: 'tile' + (m.missing ? ' missing' : ''), 'data-id': post.id, title: fmtDay(post.first.date) });
+            if (m.missing) tile.append(h('span', { class: 'missing-kind', text: KIND_LABEL[m.kind] + ' · not downloaded' }));
+            else if (m.kind === 'photo' || m.kind === 'sticker' || m.thumb) {
+                tile.append(h('img', { src: m.thumb || m.path, loading: 'lazy', decoding: 'async', alt: '' }));
+            }
+            if (!m.missing && m.kind !== 'photo' && m.kind !== 'sticker') {
+                const mark = h('span', { class: 'play-mark' });
+                mark.innerHTML = ICONS.play;
+                tile.append(mark);
+                if (m.duration) tile.append(h('span', { class: 'badge', text: m.kind === 'animation' ? 'GIF' : fmtDuration(m.duration) }));
+            }
+            const visualCount = post.media.filter(x => VISUAL.has(x.kind)).length;
+            if (visualCount > 1) tile.append(h('span', { class: 'count', text: '1/' + visualCount }));
+            tile.addEventListener('click', () => setView('feed', post.id));
+            postOf.set(tile, post);
+            return tile;
+        }
+
+        function renderGridPage(ref) {
+            const list = pagesOf(ref.chunk)[ref.pi];
+            const el = h('section', { class: 'page' });
+            let tiles = null;
+            let month = ref.pi > 0 ? pagesOf(ref.chunk)[ref.pi - 1].slice(-1)[0].first.monthKey : null;
+            for (const post of list) {
+                if (!tiles || post.first.monthKey !== month) {
+                    if (post.first.monthKey !== month) el.append(h('div', { class: 'grid-month', text: monthLabel(post.first.monthKey) }));
+                    tiles = h('div', { class: 'tiles' });
+                    el.append(tiles);
+                    month = post.first.monthKey;
+                }
+                tiles.append(renderTile(post));
+            }
+            return el;
+        }
+
+        function renderPage(ref) {
+            if (view === 'grid') return renderGridPage(ref);
+            const list = pagesOf(ref.chunk)[ref.pi];
+            const el = h('section', { class: 'page' });
+            let previous = null;
+            if (ref.pi > 0) {
+                const prevPage = pagesOf(ref.chunk)[ref.pi - 1];
+                previous = prevPage[prevPage.length - 1];
+            }
+            for (const post of list) {
+                if (!previous || previous.first.dayKey !== post.first.dayKey) el.append(dayDivider(post.first.date));
+                el.append(renderPost(post));
+                previous = post;
+            }
+            if (endsMonth(ref)) {
+                const next = nextMonthAfter(ref.ci);
+                if (next) el.append(monthEndCard(CHUNKS[ref.ci].month, next));
+            }
+            return el;
+        }
+
+        // ---- month ends
+
+        const openedMonths = new Set();
+        const fullMonth = key => new Date(Number(key.slice(0, 4)), Number(key.slice(5, 7)) - 1, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+
+        function endsMonth(ref) {
+            return ref.pi === pagesOf(ref.chunk).length - 1 && (!CHUNKS[ref.ci + 1] || CHUNKS[ref.ci + 1].month !== CHUNKS[ref.ci].month);
+        }
+
+        function nextMonthAfter(ci) {
+            const month = CHUNKS[ci].month;
+            const next = CHUNKS.find((c, i) => i > ci && c.month !== month && !chunkSkipped(c));
+            return next ? next.month : null;
+        }
+
+        function gatedAfter(ref) {
+            return view === 'feed' && endsMonth(ref) && !openedMonths.has(CHUNKS[ref.ci].month) && Boolean(nextMonthAfter(ref.ci));
+        }
+
+        function monthEndCard(month, next) {
+            const stats = INDEX.months.find(m => m.key === month);
+            const filtered = filter.from || filter.to || filter.missing;
+            return h('div', { class: 'month-end' + (openedMonths.has(month) ? ' open' : ''), 'data-month': month },
+                h('div', { class: 'month-end-title', text: 'End of ' + fullMonth(month) }),
+                stats && !filtered ? h('div', { class: 'month-end-sub', text: fmtCount(stats.count, 'message', 'messages') }) : null,
+                h('button', { class: 'month-end-next', onclick: () => openMonthEnd(month, true) }, 'Continue to ' + fullMonth(next)));
+        }
+
+        let gateArmed = null;
+        let quietTimer = null;
+
+        function noteActivity() {
+            gateArmed = null;
+            clearTimeout(quietTimer);
+            quietTimer = setTimeout(armGate, 600);
+        }
+
+        function armGate() {
+            const card = pages.length && pages[pages.length - 1].el.querySelector('.month-end:not(.open)');
+            if (!card) return;
+            const rect = card.getBoundingClientRect();
+            if (rect.top >= document.querySelector('.header').offsetHeight && rect.bottom <= innerHeight) gateArmed = card.dataset.month;
+        }
+
+        async function openMonthEnd(month, scroll) {
+            gateArmed = null;
+            openedMonths.add(month);
+            const card = feed.querySelector(`.month-end[data-month="${month}"]`);
+            if (card) card.classList.add('open');
+            await fill();
+            if (scroll && card && card.isConnected) window.scrollTo(0, card.getBoundingClientRect().top + scrollY - document.querySelector('.header').offsetHeight - 8);
+        }
+
+        function continueGesture() {
+            if (!gateArmed) return false;
+            openMonthEnd(gateArmed, false);
+            return true;
+        }
+
+        // ---- the window of pages
+
+        const feed = $('feed');
+        let pages = [];
+        let generation = 0;
+        let fillingGeneration = null;
+        let fillAgain = false;
+        let fillDone = null;
+
+        function headerOffset() {
+            return document.querySelector('.header').offsetHeight + 44;
+        }
+
+        function anchorPost() {
+            const top = headerOffset();
+            let last = null;
+            for (const page of pages) {
+                const items = page.el.querySelectorAll('[data-id]');
+                if (!items.length) continue;
+                last = items[items.length - 1];
+                if (page.el.getBoundingClientRect().bottom <= top) continue;
+                let lo = 0, hi = items.length - 1;
+                while (lo < hi) {
+                    const mid = (lo + hi) >> 1;
+                    if (items[mid].getBoundingClientRect().bottom > top) hi = mid; else lo = mid + 1;
+                }
+                if (items[lo].getBoundingClientRect().bottom > top) return items[lo];
+            }
+            return last;
+        }
+
+        function keepAnchor(mutate) {
+            const anchor = anchorPost();
+            const before = anchor ? anchor.getBoundingClientRect().top : 0;
+            mutate();
+            if (anchor && anchor.isConnected) {
+                const delta = anchor.getBoundingClientRect().top - before;
+                if (delta) window.scrollBy(0, delta);
+            }
+        }
+
+        function appendPage(ref) {
+            const el = renderPage(ref);
+            feed.append(el);
+            pages.push({ ...ref, el, version: filterVersion });
+        }
+
+        function prependPage(ref) {
+            const el = renderPage(ref);
+            keepAnchor(() => feed.prepend(el));
+            pages.unshift({ ...ref, el, version: filterVersion });
+        }
+
+        function trimPages() {
+            while (pages.length > MAX_PAGES) {
+                if (pages[0].el.getBoundingClientRect().bottom < -MARGIN) {
+                    const [first] = pages.splice(0, 1);
+                    keepAnchor(() => first.el.remove());
+                } else if (pages[pages.length - 1].el.getBoundingClientRect().top > innerHeight + MARGIN) {
+                    pages.pop().el.remove();
+                } else break;
+            }
+            if (activeVideo && !activeVideo.video.isConnected) activeVideo = null;
+        }
+
+        async function fill() {
+            const g = generation;
+            if (fillingGeneration === g) { fillAgain = true; return fillDone; }
+            if (!pages.length || pages[0].version !== filterVersion) return;
+            fillingGeneration = g;
+            fillAgain = false;
+            let finish;
+            fillDone = new Promise(resolve => { finish = resolve; });
+            try {
+                for (let guard = 0; guard < 30; guard++) {
+                    const last = pages[pages.length - 1];
+                    const first = pages[0];
+                    let changed = false;
+                    if (last.el.getBoundingClientRect().bottom < innerHeight + MARGIN && !gatedAfter(last)) {
+                        const next = await nextRef(last);
+                        if (g !== generation || last.version !== filterVersion) return;
+                        if (next) { appendPage(next); changed = true; }
+                        setEdge('end', !next);
+                    }
+                    if (first.el.getBoundingClientRect().top > -MARGIN) {
+                        const prev = await prevRef(first);
+                        if (g !== generation || first.version !== filterVersion) return;
+                        if (prev && prev.ci !== first.ci) openedMonths.add(CHUNKS[prev.ci].month);
+                        if (prev) { prependPage(prev); changed = true; }
+                        setEdge('start', !prev);
+                    }
+                    if (!changed) break;
+                }
+                trimPages();
+            } catch (err) {
+                showError(err);
+            } finally {
+                if (fillingGeneration === g) {
+                    fillingGeneration = null;
+                    if (fillAgain) await fill();
+                    noteActivity();
+                }
+                finish();
+            }
+        }
+
+        function setEdge(which, visible) {
+            const el = $(which === 'start' ? 'feed-start' : 'feed-end');
+            if (el.hidden === !visible) return;
+            if (which === 'start') keepAnchor(() => { el.hidden = !visible; });
+            else el.hidden = !visible;
+        }
+
+        function scrollToPost(id, align) {
+            const el = feed.querySelector(`[data-id="${id}"]`);
+            if (!el) return null;
+            const rect = el.getBoundingClientRect();
+            const y = align === 'end'
+                ? rect.bottom + scrollY - innerHeight + 24
+                : rect.top + scrollY - headerOffset() - 8;
+            window.scrollTo(0, Math.max(0, y));
+            return el;
+        }
+
+        async function show(ref, postId, align, flash) {
+            const g = ++generation;
+            stopActiveVideo();
+            openedMonths.clear();
+            pages = [];
+            feed.replaceChildren();
+            $('feed-start').hidden = true;
+            $('feed-end').hidden = true;
+            appendPage(ref);
+            scrollToPost(postId, align);
+            await fill();
+            if (g !== generation) return;
+            const el = scrollToPost(postId, align);
+            await fill();
+            if (g !== generation) return;
+            if (flash && el) flashPost(el);
+            updatePosition(true);
+        }
+
+        function flashPost(el) {
+            el.classList.remove('flash');
+            void el.offsetWidth;
+            el.classList.add('flash');
+        }
+
+        function chunkForId(id) {
+            const ci = CHUNKS.findIndex(c => c.last_id >= id);
+            return ci < 0 ? CHUNKS.length - 1 : ci;
+        }
+
+        async function jumpTo(id, options = {}) {
+            try {
+                for (let ci = chunkForId(id); ci < CHUNKS.length; ci++) {
+                    if (chunkSkipped(CHUNKS[ci])) continue;
+                    const chunk = await loadChunk(ci);
+                    const list = pagesOf(chunk);
+                    const exact = chunk.byId.get(id);
+                    for (let pi = 0; pi < list.length; pi++) {
+                        const post = list[pi].find(p => p === exact || p.first.id >= id);
+                        if (post) return show({ ci, pi, chunk }, post.id, 'start', options.flash);
+                    }
+                }
+                return jumpToEnd();
+            } catch (err) {
+                showError(err);
+            }
+        }
+
+        async function openMessage(id) {
+            try {
+                const post = (await loadChunk(chunkForId(id))).byId.get(id);
+                if (post && !postVisible(post)) {
+                    if (view === 'grid' && !post.media.some(m => VISUAL.has(m.kind))) chooseView('feed');
+                    if (!postVisible(post)) {
+                        filterControls.reset();
+                        applyFilter({ from: '', to: '', missing: false });
+                    }
+                }
+            } catch (err) {
+                return showError(err);
+            }
+            return jumpTo(id, { flash: true });
+        }
+
+        async function jumpToEnd() {
+            for (let ci = CHUNKS.length - 1; ci >= 0; ci--) {
+                if (chunkSkipped(CHUNKS[ci])) continue;
+                const chunk = await loadChunk(ci);
+                const list = pagesOf(chunk);
+                if (list.length) {
+                    const page = list[list.length - 1];
+                    return show({ ci, pi: list.length - 1, chunk }, page[page.length - 1].id, 'end');
+                }
+            }
+            generation++;
+            pages = [];
+            feed.replaceChildren(h('div', { class: 'status', text: 'No messages match the current filter.' }));
+            $('feed-start').hidden = true;
+            $('feed-end').hidden = true;
+        }
+
+        async function jumpToStart() {
+            if (!$('feed-start').hidden) return window.scrollTo(0, 0);
+            try {
+                for (let ci = 0; ci < CHUNKS.length; ci++) {
+                    if (chunkSkipped(CHUNKS[ci])) continue;
+                    const chunk = await loadChunk(ci);
+                    const list = pagesOf(chunk);
+                    if (list.length) {
+                        await show({ ci, pi: 0, chunk }, list[0][0].id, 'start');
+                        return window.scrollTo(0, 0);
+                    }
+                }
+                return jumpToEnd();
+            } catch (err) {
+                showError(err);
+            }
+        }
+
+        async function jumpToDate(day) {
+            const ci = CHUNKS.findIndex(c => c.last_date.slice(0, 10) >= day && !chunkSkipped(c));
+            if (ci < 0) return jumpToEnd();
+            const chunk = await loadChunk(ci);
+            const post = chunk.posts.find(p => p.first.dayKey >= day && postVisible(p));
+            return jumpTo(post ? post.id : CHUNKS[ci].last_id + 1);
+        }
+
+        function showError(err) {
+            console.error(err);
+            feed.replaceChildren(h('div', { class: 'status error', text: err.message || String(err) }));
+        }
+
+        // ---- position
+
+        let currentId = null;
+        let hashTimer = null;
+        let pillTimer = null;
+
+        function updatePosition(force) {
+            const el = anchorPost();
+            if (!el) return;
+            const post = postOf.get(el);
+            if (!post) return;
+            const pill = $('date-pill');
+            const rect = feed.getBoundingClientRect();
+            const under = document.elementFromPoint(rect.left + rect.width / 2, document.querySelector('.header').offsetHeight + 22);
+            pill.textContent = fmtDay(post.first.date);
+            pill.classList.toggle('show', !(under && under.closest('.day')));
+            clearTimeout(pillTimer);
+            pillTimer = setTimeout(() => pill.classList.remove('show'), 1200);
+            if (post.id === currentId && !force) return;
+            currentId = post.id;
+            setActiveMonth(post.first.monthKey);
+            clearTimeout(hashTimer);
+            hashTimer = setTimeout(() => history.replaceState(null, '', '#' + currentId), 250);
+        }
+
+        let scrollQueued = false;
+        window.addEventListener('wheel', e => {
+            if (e.deltaY > 0 && continueGesture()) return;
+            noteActivity();
+        }, { passive: true });
+        let touchY = null;
+        window.addEventListener('touchstart', e => { touchY = e.touches[0].clientY; }, { passive: true });
+        window.addEventListener('touchmove', e => {
+            if (touchY !== null && touchY - e.touches[0].clientY > 10 && continueGesture()) { touchY = null; return; }
+            noteActivity();
+        }, { passive: true });
+
+        window.addEventListener('scroll', () => {
+            noteActivity();
+            if (scrollQueued) return;
+            scrollQueued = true;
+            requestAnimationFrame(() => {
+                scrollQueued = false;
+                updatePosition(false);
+                fill();
+            });
+        }, { passive: true });
+        window.addEventListener('resize', () => fill());
+
+        window.addEventListener('hashchange', () => {
+            const id = Number(location.hash.slice(1));
+            if (!id || id === currentId) return;
+            const el = scrollToPost(id, 'start');
+            if (el) { flashPost(el); updatePosition(true); } else jumpTo(id, { flash: true });
+        });
+
+        // ---- sidebar
+
+        const monthRows = new Map();
+
+        function buildSidebar() {
+            const nav = $('sidebar');
+            nav.replaceChildren();
+            const months = INDEX.months;
+            const files = months.reduce((n, m) => n + m.video + m.photo + m.other, 0);
+            const missing = months.reduce((n, m) => n + m.missing, 0);
+            nav.append(h('div', { class: 'nav-summary' },
+                h('div', { class: 'nav-total', text: fmtCount(INDEX.total, 'message', 'messages') }),
+                h('div', { class: 'nav-sub' }, fmtCount(files, 'file', 'files'),
+                    missing ? h('span', { class: 'warn', text: ' · ' + fmtNumber(missing) + ' not downloaded' }) : null),
+                INDEX.updated ? h('div', { class: 'nav-sub', text: 'Updated ' + fmtShortDay(parseLocal(INDEX.updated)) }) : null));
+
+            const firstDay = months.length ? CHUNKS[0].first_date.slice(0, 10) : '';
+            const lastDay = months.length ? CHUNKS[CHUNKS.length - 1].last_date.slice(0, 10) : '';
+            const dateInput = (attrs) => h('input', { type: 'date', min: firstDay, max: lastDay, ...attrs });
+            const goToClear = h('button', { class: 'nav-clear', text: 'Clear', style: 'visibility: hidden', onclick: () => {
+                goTo.value = '';
+                goToClear.style.visibility = 'hidden';
+            } });
+            const goTo = dateInput({
+                oninput: e => { goToClear.style.visibility = e.target.value ? '' : 'hidden'; },
+                onchange: e => { if (e.target.value) { jumpToDate(e.target.value); closeSheet(); } },
+            });
+            const from = dateInput({ onchange: e => setFilter({ from: e.target.value }) });
+            const to = dateInput({ onchange: e => setFilter({ to: e.target.value }) });
+            const onlyMissing = h('input', { type: 'checkbox', onchange: e => setFilter({ missing: e.target.checked }) });
+            const reset = () => { from.value = ''; to.value = ''; onlyMissing.checked = false; };
+            const clear = h('button', { class: 'nav-clear', hidden: true, text: 'Clear filter', onclick: () => {
+                reset();
+                setFilter({ from: '', to: '', missing: false });
+            } });
+            filterControls = { clear, reset };
+            nav.append(h('div', { class: 'nav-tools' },
+                h('div', { class: 'nav-goto' }, h('label', null, 'Go to date', goTo), goToClear),
+                h('div', { class: 'nav-range' }, h('label', null, 'From', from), h('label', null, 'To', to)),
+                missing ? h('label', { class: 'nav-check' }, onlyMissing, 'Only not downloaded') : null,
+                clear));
+
+            if (!months.length) return;
+            const byKey = new Map(months.map(m => [m.key, m]));
+            const maxCount = Math.max(...months.map(m => m.count));
+            const firstYear = Number(months[0].key.slice(0, 4));
+            const lastYear = Number(months[months.length - 1].key.slice(0, 4));
+            let gap = [];
+            const flushGap = () => {
+                if (!gap.length) return;
+                const a = gap[0], b = gap[gap.length - 1];
+                nav.append(h('div', { class: 'nav-gap', text: '⋯ ' + (a === b ? a : a + ' – ' + b) + ' · no messages' }));
+                gap = [];
+            };
+            for (let year = firstYear; year <= lastYear; year++) {
+                const yearMonths = months.filter(m => m.key.startsWith(year + '-'));
+                if (!yearMonths.length) { gap.push(year); continue; }
+                flushGap();
+                const block = h('div', { class: 'nav-year open', 'data-year': year });
+                const total = yearMonths.reduce((n, m) => n + m.count, 0);
+                block.append(h('button', { class: 'nav-year-row', onclick: () => block.classList.toggle('open') },
+                    h('span', { class: 'nav-chevron', text: '▶' }),
+                    h('span', null, String(year), h('span', { class: 'nav-year-now' })),
+                    h('span', { class: 'nav-year-count', text: fmtNumber(total) })));
+                const list = h('div', { class: 'nav-months' });
+                const firstMonth = year === firstYear ? Number(months[0].key.slice(5, 7)) - 1 : 0;
+                const lastMonth = year === lastYear ? Number(months[months.length - 1].key.slice(5, 7)) - 1 : 11;
+                for (let month = firstMonth; month <= lastMonth; month++) {
+                    const key = `${year}-${String(month + 1).padStart(2, '0')}`;
+                    list.append(monthRow(key, byKey.get(key), maxCount));
+                }
+                block.append(list);
+                nav.append(block);
+            }
+            flushGap();
+        }
+
+        let filterControls = null;
+
+        function monthRow(key, stats, maxCount) {
+            const count = stats ? stats.count : 0;
+            const row = h('button', { class: 'nav-month' + (count ? '' : ' empty'), 'data-month': key, disabled: !count });
+            const bar = h('div', { class: 'nav-bar' });
+            if (count) {
+                const width = Math.max(6, Math.round(Math.sqrt(count) / Math.sqrt(maxCount) * 100));
+                for (const [cls, n] of [['v', stats.video], ['p', stats.photo], ['o', stats.other + stats.text]]) {
+                    if (n) bar.append(h('span', { class: cls, style: `width:${width * n / count}%` }));
+                }
+                const parts = [fmtCount(count, 'message', 'messages')];
+                if (stats.video) parts.push(fmtCount(stats.video, 'video', 'videos'));
+                if (stats.photo) parts.push(fmtCount(stats.photo, 'photo', 'photos'));
+                if (stats.other) parts.push(fmtCount(stats.other, 'other file', 'other files'));
+                if (stats.missing) parts.push(`${fmtNumber(stats.missing)} not downloaded`);
+                row.title = monthLabel(key) + ' · ' + parts.join(' · ');
+                row.addEventListener('click', () => { jumpToMonth(key); closeSheet(); });
+            }
+            row.append(h('span', { text: MONTHS[Number(key.slice(5)) - 1] }), bar,
+                h('span', { class: 'nav-count' }, stats && stats.missing ? h('span', { class: 'dot' }) : null, count ? fmtNumber(count) : ''));
+            monthRows.set(key, row);
+            return row;
+        }
+
+        function jumpToMonth(key) {
+            const ci = CHUNKS.findIndex(c => c.month === key && !chunkSkipped(c));
+            if (ci >= 0) return jumpToDate(CHUNKS[ci].first_date.slice(0, 10) < key + '-01' ? key + '-01' : CHUNKS[ci].first_date.slice(0, 10));
+        }
+
+        let activeMonth = null;
+
+        function setActiveMonth(key) {
+            if (key === activeMonth) return;
+            if (activeMonth && monthRows.get(activeMonth)) monthRows.get(activeMonth).classList.remove('active');
+            activeMonth = key;
+            const row = monthRows.get(key);
+            document.querySelectorAll('.nav-year.current').forEach(b => b.classList.remove('current'));
+            if (!row) return;
+            row.classList.add('active');
+            const block = row.closest('.nav-year');
+            block.classList.add('current');
+            block.querySelector('.nav-year-now').textContent = ' · ' + MONTHS[Number(key.slice(5)) - 1];
+            const target = block.classList.contains('open') ? row : block.firstChild;
+            const nav = $('sidebar');
+            const top = target.offsetTop - nav.clientHeight / 2;
+            if (target.offsetTop < nav.scrollTop + 40 || target.offsetTop > nav.scrollTop + nav.clientHeight - 40) nav.scrollTo({ top });
+        }
+
+        function markFilteredMonths() {
+            for (const [key, row] of monthRows) {
+                const outside = (filter.from && key < filter.from.slice(0, 7)) || (filter.to && key > filter.to.slice(0, 7));
+                row.classList.toggle('outside', Boolean(outside));
+            }
+        }
+
+        function updateEdgeNotes() {
+            const filtered = filter.from || filter.to || filter.missing;
+            $('feed-start').querySelector('.edge-note').textContent = filtered ? 'Beginning of the filtered messages' : 'Beginning of the archive';
+            $('feed-end').querySelector('.edge-note').textContent = filtered ? 'End of the filtered messages'
+                : 'Newest message in this export' + (INDEX.updated ? ' · updated ' + fmtShortDay(parseLocal(INDEX.updated)) : '');
+        }
+
+        function applyFilter(change) {
+            Object.assign(filter, change);
+            filterVersion++;
+            filterControls.clear.hidden = !(filter.from || filter.to || filter.missing);
+            markFilteredMonths();
+            updateEdgeNotes();
+        }
+
+        function setFilter(change) {
+            applyFilter(change);
+            const target = currentId;
+            if (target) jumpTo(target); else jumpToEnd();
+        }
+
+        function openSheet() { $('sidebar').classList.add('open'); $('scrim').hidden = false; }
+        function closeSheet() { $('sidebar').classList.remove('open'); $('scrim').hidden = true; }
+        $('timeline-btn').addEventListener('click', () => $('sidebar').classList.contains('open') ? closeSheet() : openSheet());
+        $('scrim').addEventListener('click', closeSheet);
+
+        // ---- search
+
+        let searchRows = null;
+        let searchLoading = null;
+        let searchTimer = null;
+        let selected = -1;
+
+        function normalize(s) {
+            return s.normalize('NFKD')
+                .replace(/[̀-ًͯ-ٰٟۖ-ۭـ]/g, '')
+                .replace(/[إأآٱ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه')
+                .toLowerCase();
+        }
+
+        function loadSearch() {
+            if (!searchLoading) {
+                searchLoading = new Promise((resolve, reject) => {
+                    searchRowsReady = rows => {
+                        searchRows = rows.map(([id, date, text]) => ({ id, date, text, norm: normalize(text) }));
+                        resolve();
+                    };
+                    loadScript('data/search.js').catch(err => { searchLoading = null; reject(err); });
+                });
+            }
+            return searchLoading;
+        }
+
+        function highlight(text, term) {
+            let norm = '';
+            const map = [];
+            for (let i = 0; i < text.length; i++) {
+                for (const c of normalize(text[i])) { norm += c; map.push(i); }
+            }
+            const at = term ? norm.indexOf(term) : -1;
+            const clean = s => s.replace(/\s+/g, ' ');
+            if (at < 0) return [clean(text.slice(0, 220))];
+            const start = map[at];
+            const end = at + term.length - 1 < map.length ? map[at + term.length - 1] + 1 : text.length;
+            let from = Math.max(0, start - 70);
+            if (from && /[\udc00-\udfff]/.test(text[from])) from--;
+            return [(from ? '…' : '') + clean(text.slice(from, start)), h('mark', { text: text.slice(start, end) }), clean(text.slice(end, end + 150))];
+        }
+
+        async function runSearch(query) {
+            const panel = $('results');
+            const terms = normalize(query).split(/\s+/).filter(Boolean);
+            if (!terms.length) { panel.hidden = true; return; }
+            panel.hidden = false;
+            if (!searchRows) {
+                panel.replaceChildren(h('div', { class: 'results-head', text: 'Loading search…' }));
+                try { await loadSearch(); } catch (err) { panel.replaceChildren(h('div', { class: 'results-head', text: err.message })); return; }
+                if ($('search').value !== query) return;
+            }
+            const inRange = r => (!filter.from || r.date.slice(0, 10) >= filter.from) && (!filter.to || r.date.slice(0, 10) <= filter.to);
+            const matches = searchRows.filter(r => inRange(r) && terms.every(t => r.norm.includes(t))).reverse();
+            selected = -1;
+            const head = h('div', { class: 'results-head' });
+            panel.replaceChildren(head);
+            let shown = 0;
+            const more = h('button', { class: 'results-more', onclick: e => { e.stopPropagation(); showMore(); } });
+            const showMore = () => {
+                const rows = matches.slice(shown, shown + SEARCH_PAGE);
+                shown += rows.length;
+                more.before(...rows.map(row => h('button', { class: 'result', onclick: () => openResult(row.id) },
+                    h('div', { class: 'result-date', text: fmtDay(parseLocal(row.date)) + ', ' + row.date.slice(11, 16) }),
+                    h('div', { class: 'result-text', dir: 'auto' }, highlight(row.text, terms[0])))));
+                head.textContent = matches.length ? fmtCount(matches.length, 'message', 'messages') + (matches.length > shown ? ` · newest ${fmtNumber(shown)} shown` : '') : 'No messages found';
+                more.textContent = `Show older (${fmtNumber(Math.min(SEARCH_PAGE, matches.length - shown))} more)`;
+                more.hidden = shown >= matches.length;
+            };
+            panel.append(more);
+            showMore();
+        }
+
+        function openResult(id) {
+            $('results').hidden = true;
+            $('search').blur();
+            openMessage(id);
+        }
+
+        function searchFor(text) {
+            const input = $('search');
+            input.value = text;
+            input.focus();
+            runSearch(text);
+        }
+
+        $('search').addEventListener('focus', () => { loadSearch().catch(() => {}); if ($('search').value.trim()) runSearch($('search').value); });
+        $('search').addEventListener('input', e => {
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(() => runSearch(e.target.value), 150);
+        });
+        $('search').addEventListener('keydown', e => {
+            const items = [...document.querySelectorAll('.result')];
+            if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                e.preventDefault();
+                selected = Math.max(0, Math.min(items.length - 1, selected + (e.key === 'ArrowDown' ? 1 : -1)));
+                items.forEach((el, i) => el.classList.toggle('sel', i === selected));
+                if (items[selected]) items[selected].scrollIntoView({ block: 'nearest' });
+            } else if (e.key === 'Enter' && items.length) {
+                items[Math.max(0, selected)].click();
+            } else if (e.key === 'Escape') {
+                $('results').hidden = true;
+                e.target.blur();
+            }
+        });
+        document.addEventListener('click', e => {
+            if (!e.target.closest('.results') && !e.target.closest('.search-wrap')) $('results').hidden = true;
+        });
+
+        // ---- clicks inside posts
+
+        feed.addEventListener('click', e => {
+            const tag = e.target.closest('.tag');
+            if (tag) return searchFor(tag.dataset.q);
+            const spoiler = e.target.closest('.spoiler');
+            if (spoiler) return spoiler.classList.add('shown');
+            const img = e.target.closest('img[data-full]');
+            if (img) return openLightbox(img, [...feed.querySelectorAll('img[data-full]')]);
+        });
+
+        // ---- lightbox
+
+        let lbList = [];
+        let lbIndex = 0;
+
+        function openLightbox(el, list) {
+            lbList = list;
+            lbIndex = lbList.indexOf(el);
+            stopActiveVideo();
+            showLightbox();
+            $('lightbox').hidden = false;
+            document.body.style.overflow = 'hidden';
+        }
+
+        function resetLightboxVideo() {
+            const video = $('lb-video');
+            video.pause();
+            video.removeAttribute('src');
+            video.load();
+            video.hidden = true;
+        }
+
+        function showLightbox() {
+            const entry = lbList[lbIndex];
+            resetLightboxVideo();
+            if (entry.dataset.video) {
+                const video = $('lb-video');
+                $('lb-img').hidden = true;
+                $('lb-img').removeAttribute('src');
+                video.loop = video.muted = entry.dataset.kind === 'animation';
+                video.src = entry.dataset.video;
+                video.hidden = false;
+                video.play().catch(() => {});
+            } else {
+                $('lb-img').hidden = false;
+                $('lb-img').src = entry.dataset.full;
+            }
+            $('lb-count').textContent = `${lbIndex + 1} / ${lbList.length}`;
+            $('lb-prev').hidden = lbIndex === 0;
+            $('lb-next').hidden = lbIndex === lbList.length - 1;
+        }
+
+        function stepLightbox(delta) {
+            const next = lbIndex + delta;
+            if (next < 0 || next >= lbList.length) return;
+            lbIndex = next;
+            showLightbox();
+        }
+
+        function closeLightbox() {
+            $('lightbox').hidden = true;
+            $('lb-img').removeAttribute('src');
+            resetLightboxVideo();
+            document.body.style.overflow = '';
+            const entry = lbList[lbIndex];
+            if (entry && entry.isConnected) {
+                const post = entry.closest('[data-id]');
+                if (post) {
+                    const rect = post.getBoundingClientRect();
+                    if (rect.bottom < headerOffset() || rect.top > innerHeight) scrollToPost(post.dataset.id, 'start');
+                }
+            }
+        }
+
+        $('lb-close').addEventListener('click', closeLightbox);
+        $('lb-prev').addEventListener('click', e => { e.stopPropagation(); stepLightbox(-1); });
+        $('lb-next').addEventListener('click', e => { e.stopPropagation(); stepLightbox(1); });
+        $('lightbox').addEventListener('click', e => { if (e.target.id === 'lightbox') closeLightbox(); });
+
+        // ---- keyboard
+
+        function stepPost(delta) {
+            const line = headerOffset() + 8;
+            const posts = [...feed.querySelectorAll('[data-id]')];
+            const tops = posts.map(el => el.getBoundingClientRect().top);
+            const target = delta > 0 ? posts.find((el, i) => tops[i] > line + 1) : posts.findLast((el, i) => tops[i] < line - 1);
+            if (target) scrollToPost(target.dataset.id, 'start');
+        }
+
+        async function stepMonth(delta) {
+            const keys = INDEX.months.map(m => m.key);
+            for (let i = keys.indexOf(activeMonth) + delta; i >= 0 && i < keys.length; i += delta) {
+                for (let ci = 0; ci < CHUNKS.length; ci++) {
+                    if (CHUNKS[ci].month !== keys[i] || chunkSkipped(CHUNKS[ci])) continue;
+                    if (pagesOf(await loadChunk(ci)).length) return jumpToMonth(keys[i]);
+                }
+            }
+        }
+
+        document.addEventListener('keydown', e => {
+            if (!$('lightbox').hidden) {
+                if (e.key === 'Escape') closeLightbox();
+                else if (e.key === 'ArrowLeft') stepLightbox(-1);
+                else if (e.key === 'ArrowRight') stepLightbox(1);
+                return;
+            }
+            if (e.target.closest('input, textarea, select') || e.metaKey || e.ctrlKey || e.altKey) return;
+            if (['ArrowDown', 'PageDown', 'End', ' ', 'j'].includes(e.key) && !e.shiftKey && !e.target.closest('button') && continueGesture()) return;
+            noteActivity();
+            if (e.key === '/') { e.preventDefault(); $('search').focus(); }
+            else if (e.key === 'j') stepPost(1);
+            else if (e.key === 'k') stepPost(-1);
+            else if (e.key === ']') stepMonth(1);
+            else if (e.key === '[') stepMonth(-1);
+            else if (e.key === 'Escape') closeSheet();
+        });
+
+        // ---- theme
+
+        const THEMES = ['system', 'light', 'dark'];
+        const THEME_ICONS = {
+            system: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor"/></svg>',
+            light: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
+            dark: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>',
+        };
+
+        function applyTheme(theme) {
+            if (theme === 'system') document.documentElement.removeAttribute('data-theme');
+            else document.documentElement.setAttribute('data-theme', theme);
+            const button = $('theme-btn');
+            button.innerHTML = THEME_ICONS[theme];
+            button.title = 'Theme: ' + theme;
+        }
+
+        let theme = 'system';
+        try { theme = localStorage.getItem('tg-archive-theme') || 'system'; } catch (e) {}
+        if (!THEMES.includes(theme)) theme = 'system';
+        applyTheme(theme);
+        $('theme-btn').addEventListener('click', () => {
+            theme = THEMES[(THEMES.indexOf(theme) + 1) % THEMES.length];
+            applyTheme(theme);
+            try { localStorage.setItem('tg-archive-theme', theme); } catch (e) {}
+        });
+
+        // ---- start
+
+        const CHAT_TYPES = { public_channel: 'Channel', public_group: 'Group', public_supergroup: 'Group', personal_chat: 'Private chat' };
+
+        function buildHeader() {
+            const chat = INDEX.chat || {};
+            const name = chat.name || 'Telegram Archive';
+            document.title = name + ' · Telegram Archive';
+            $('chat-name').textContent = name;
+            const fillAvatar = el => {
+                el.style.background = avatarColor(chat.id || name);
+                el.textContent = initials(name);
+                if (chat.photo) {
+                    const img = h('img', { src: chat.photo, alt: '' });
+                    img.onerror = () => { el.textContent = initials(name); };
+                    el.replaceChildren(img);
+                }
+                return el;
+            };
+            fillAvatar($('avatar'));
+            const months = INDEX.months;
+            const range = months.length ? monthLabel(months[0].key) + (months.length > 1 ? ' – ' + monthLabel(months[months.length - 1].key) : '') : '';
+            const meta = [chat.username ? '@' + chat.username : null, CHAT_TYPES[chat.type] || 'Chat', fmtCount(INDEX.total, 'message', 'messages'), range].filter(Boolean).join(' · ');
+            $('chat-meta').textContent = meta;
+            showAuthor = chat.type !== 'public_channel';
+
+            const title = chat.username
+                ? h('a', { href: 'https://t.me/' + encodeURIComponent(chat.username), target: '_blank', rel: 'noopener noreferrer', text: name })
+                : name;
+            $('feed-start').replaceChildren(fillAvatar(h('div', { class: 'avatar' })), h('h2', { dir: 'auto' }, title),
+                h('div', { text: meta }),
+                chat.description ? h('div', { class: 'description', dir: 'auto', text: chat.description }) : null,
+                h('div', { class: 'edge-note' }));
+            $('feed-end').replaceChildren(h('div', { class: 'edge-note' }));
+            updateEdgeNotes();
+        }
+
+        const VIEW_ICONS = {
+            feed: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>',
+            grid: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="3" width="16" height="8" rx="1.5"/><path d="M4 15h16M4 19h11"/></svg>',
+        };
+
+        function applyView() {
+            document.body.classList.toggle('grid', view === 'grid');
+            const button = $('view-btn');
+            button.innerHTML = VIEW_ICONS[view];
+            button.title = view === 'grid' ? 'Show messages' : 'Show media only';
+            button.setAttribute('aria-label', button.title);
+        }
+
+        function chooseView(next) {
+            view = next;
+            try { localStorage.setItem('tg-archive-view', view); } catch (e) {}
+            applyView();
+            filterVersion++;
+        }
+
+        function setView(next, id) {
+            chooseView(next);
+            const target = id || currentId;
+            if (target) jumpTo(target, { flash: Boolean(id) }); else jumpToEnd();
+        }
+
+        for (const el of document.querySelectorAll('.to-start')) el.addEventListener('click', jumpToStart);
+        document.querySelector('.identity').addEventListener('keydown', e => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); jumpToStart(); }
+        });
+
+        $('view-btn').addEventListener('click', () => setView(view === 'grid' ? 'feed' : 'grid'));
+
+        function start() {
+            if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+            if (!INDEX) {
+                feed.replaceChildren(h('div', { class: 'status error', text: 'data/index.js could not be loaded. Rebuild the viewer with: python bot.py --viewer-only <export directory>' }));
+                return;
+            }
+            for (const month of INDEX.months) {
+                for (const chunk of month.chunks) CHUNKS.push({ ...chunk, month: month.key });
+            }
+            applyView();
+            buildHeader();
+            buildSidebar();
+            if (!CHUNKS.length) {
+                feed.replaceChildren(h('div', { class: 'status', text: 'This export has no messages.' }));
+                return;
+            }
+            const id = Number(location.hash.slice(1));
+            if (id) jumpTo(id); else jumpToEnd();
+        }
+
+        start();
+    </script>
+</body>
+</html>
