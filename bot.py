@@ -1036,7 +1036,6 @@ MAX_FILE_SIZE = args.max_file_size
 MAX_TOTAL_SIZE = args.max_total_size
 REFRESH = args.refresh
 DOWNLOAD_PATH = os.path.abspath(os.path.expanduser(args.output))
-os.makedirs(DOWNLOAD_PATH, exist_ok=True)
 
 SESSION_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.telegram')
 os.makedirs(SESSION_DIR, exist_ok=True)
@@ -1079,6 +1078,7 @@ def lock_session() -> None:
 
 
 lock_session()
+os.makedirs(DOWNLOAD_PATH, exist_ok=True)
 
 app = Client(
     "my_bot",
