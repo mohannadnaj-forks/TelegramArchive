@@ -109,6 +109,8 @@ Set `CHATS` and `HOST_DOWNLOAD_PATH` in `.env`, then `make build-up`. Log in onc
 ```shell
 .venv/bin/python -m unittest
 ```
+The tests run the program against a fake Telegram client (`tests/fake_telegram.py`), with no network
+and no login. `TELEGRAM_ARCHIVE_SLOW_TESTS=1` adds a 200,000-message memory test.
 
 ## Contribute
 Read [CONTRIBUTING.md](CONTRIBUTING.md).
