@@ -11,7 +11,7 @@ class ChatExporter:
 		self.app: Client = app
 		# Map each ChatType to its corresponding export-flag in the config
 		self._export_map: dict[ChatType, bool] = {
-			ChatType.CHANNEL: CHAT_EXPORT.get("channels", False),
+			ChatType.CHANNEL: CHAT_EXPORT.get("channel", False),
 			ChatType.SUPERGROUP: CHAT_EXPORT.get("super_group", False),
 			ChatType.GROUP: CHAT_EXPORT.get("group", False),
 			ChatType.PRIVATE: CHAT_EXPORT.get("personal", False),
