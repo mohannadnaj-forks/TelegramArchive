@@ -46,6 +46,7 @@ ZERO_BYTES_MAX_RETRIES = int(os.environ.get("ZERO_BYTES_MAX_RETRIES", "2"))
 SUSPECTED_FLOOD_WAIT_DURATION = int(os.environ.get("SUSPECTED_FLOOD_WAIT_DURATION", "300"))
 
 # Checkpointing
+CHECKPOINT_SECONDS = int(os.environ.get("CHECKPOINT_SECONDS", "10"))
 RESUME_ENABLED = str_to_bool(os.environ.get("RESUME_ENABLED", "True"))
 
 # File safety

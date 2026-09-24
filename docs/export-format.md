@@ -10,6 +10,8 @@ ChatExport_<chat>_<YYYY-MM-DD>/
   result.json          the export (or result_part1.json, result_part2.json, ... when JSON_FILE_PAGE_SIZE is set;
                        each part has the top-level fields below and a consecutive run of the messages)
   export_state.json    progress of the export, for resuming and for other programs to read (see below)
+  export_journal.jsonl only while a run is going, or after one was killed: records saved since result.json
+                       was last written (see below)
   chat_photo.jpg       the chat's picture, downloaded once
   index.html, data/    the viewer, regenerated from result.json on every run and by --viewer-only:
                        data/index.js, one data/<YYYY-MM>.js per month (records unchanged), data/search.js
@@ -156,8 +158,8 @@ A run has two passes.
 
 1. **Listing** walks the history from newest to oldest, within `--since`/`--until` when given,
    and writes a record for every message it has not listed before. A file that is wanted and
-   not on disk is recorded as `pending`. Progress is saved at most once a minute and when the
-   run stops, so a stopped listing keeps what it listed.
+   not on disk is recorded as `pending`. Progress is saved every `CHECKPOINT_SECONDS` (10 by
+   default) and when the run stops, so a stopped listing keeps what it listed.
 2. **Downloading** goes through the records whose file is wanted (`pending`, `failed`,
    `total_limit`, or `disabled`/`too_large` when the settings now allow it), newest first,
    fetches those messages again by id, and downloads their files. `--max-total-size` is
@@ -169,6 +171,16 @@ posted since. Edits to and deletions of messages already listed are only picked 
 `--refresh`, which lists the whole history again; a stopped `--refresh` starts over.
 
 An export without `export_state.json` is listed again in full on its next run, keeping its files.
+
+### Saving: `export_journal.jsonl`
+
+A checkpoint appends the records added or changed since the last one to
+`export_journal.jsonl`, one JSON record per line; a later line for the same `id` replaces an
+earlier one. `result.json` and the viewer are rewritten only when a run ends (finished,
+stopped or failed), and the journal is then deleted. If a run is killed, the next run (and
+`--viewer-only`) reads `result.json` plus the journal, ignoring a last line cut short.
+While a run is going, `result.json` is therefore behind; `export_state.json` has the current
+counts.
 
 ### `export_state.json`
 
@@ -197,7 +209,8 @@ An export without `export_state.json` is listed again in full on its next run, k
 | `run.messages_in_chat` | Telegram's count at the start of the run, or `null` if it could not be read |
 | `run.files` | count and bytes of files per `file_status` state |
 
-The file is written after `result.json`, so it never claims more than `result.json` holds.
+The file is written after the journal, so it never claims more than `result.json` and the
+journal hold together.
 Deleting it only makes the next run list the history again.
 
 ## Scale reference

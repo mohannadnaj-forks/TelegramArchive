@@ -22,7 +22,7 @@ from pyrogram.file_id import FileId
 from configs import (
     API_ID, API_HASH, MEDIA_EXPORT, FILE_NOT_FOUND, NOT_INCLUDED, MIN_FREE_DISK_MB, 
     JSON_FILE_PAGE_SIZE, DOWNLOAD_PATH, FLOOD_WAIT_MAX_SLEEP,
-    DOWNLOAD_MAX_RETRIES, RESUME_ENABLED,
+    DOWNLOAD_MAX_RETRIES, CHECKPOINT_SECONDS, RESUME_ENABLED,
     ATOMIC_WRITES, ZERO_BYTES_MAX_RETRIES,
     SUSPECTED_FLOOD_WAIT_DURATION
 )
@@ -163,10 +163,19 @@ async def download_media_with_flood_control(file_id: str, destination: str, pbar
     return False, last_error
 
 def load_existing_export(username: str) -> dict:
-    """Load existing result.json if it exists to preserve previous messages."""
+    """Load the existing export, with the records saved to the journal since result.json was last written."""
     json_name = generate_json_name(username)
-    
-    # Try to load main result.json first
+    data = load_result_json(json_name)
+    journal = read_journal(os.path.dirname(json_name))
+    if journal:
+        messages = {m['id']: m for m in data.get('messages', [])}
+        messages.update(journal)
+        data['messages'] = list(messages.values())
+        logger.info(f"📂 Recovered {len(journal):,} messages saved since result.json was last written")
+    return data
+
+
+def load_result_json(json_name: str) -> dict:
     if os.path.exists(json_name):
         try:
             with open(json_name, 'r', encoding='utf-8') as f:
@@ -206,10 +215,37 @@ def load_existing_export(username: str) -> dict:
     
     return {}
 
+
+JOURNAL_FILE = 'export_journal.jsonl'
+
+
+def read_journal(export_directory: str) -> dict:
+    # One message record per line; later lines replace earlier ones. A line cut short by a crash ends the read.
+    records = {}
+    try:
+        with open(os.path.join(export_directory, JOURNAL_FILE), encoding='utf-8') as f:
+            for line in f:
+                try:
+                    record = json.loads(line)
+                except ValueError:
+                    break
+                records[record['id']] = record
+    except FileNotFoundError:
+        pass
+    return records
+
+
+def append_journal(export_directory: str, records: list) -> None:
+    with open(os.path.join(export_directory, JOURNAL_FILE), 'a', encoding='utf-8') as f:
+        for record in records:
+            f.write(json.dumps(record, default=str) + '\n')
+        f.flush()
+        os.fsync(f.fileno())
+
+
 shutdown_requested = False
 FILE_REFERENCE_CHUNK = 100
 FILE_REFERENCE_MAX_AGE = 1800
-CHECKPOINT_MIN_SECONDS = 60
 
 
 # First Ctrl-C lets the current message finish so progress can be saved; a second one exits immediately.
@@ -821,13 +857,22 @@ class ChatExport:
         self.state = load_state(self.directory) if self.exported else {}
         self.state.setdefault('listed', [])
         self.state['run'] = {'status': 'running', 'stage': 'listing', 'pid': os.getpid(), 'started': now()}
+        self.dirty = set()
         self.written_at = time.time()
 
-    def save(self, force: bool = False) -> None:
-        if not force and time.time() - self.written_at < CHECKPOINT_MIN_SECONDS:
+    def save(self, final: bool = False) -> None:
+        # Checkpoints append changed records to the journal; result.json is rewritten, and the journal
+        # removed, only when the run ends. The state is written last, so it never runs ahead of the records.
+        if not final and time.time() - self.written_at < CHECKPOINT_SECONDS:
             return
-        self.archive.chat_data['messages'] = list(self.exported.values())
-        write_export(self.archive.chat_data, self.json_name)
+        if final:
+            self.archive.chat_data['messages'] = list(self.exported.values())
+            write_export(self.archive.chat_data, self.json_name)
+            if os.path.exists(os.path.join(self.directory, JOURNAL_FILE)):
+                os.remove(os.path.join(self.directory, JOURNAL_FILE))
+        elif self.dirty:
+            append_journal(self.directory, [self.exported[i] for i in self.dirty])
+        self.dirty.clear()
         self.state['run'].update(updated=now(), messages_exported=len(self.exported),
                                  files=file_states(self.exported.values()))
         write_state(self.directory, self.state)
@@ -852,7 +897,9 @@ class ChatExport:
                 logger.error(f"❌ Stopping: {e}")
         complete = self.state['run']['stage'] == 'complete'
         self.state['run']['status'] = 'complete' if complete else 'failed' if failure else 'stopped'
-        self.save(force=True)
+        if not complete:
+            print("💾 Saving...")
+        self.save(final=True)
         generate_index_html(self.directory, self.archive.chat_data)
         self.report()
         if failure is not None and not isinstance(failure, LowDiskSpace):
@@ -889,6 +936,7 @@ class ChatExport:
                 msg_info = {}
                 await self.archive.process_message(self.chat, message, msg_info, bar)
                 self.exported[message.id] = msg_info
+                self.dirty.add(message.id)
                 top = top or message.id
                 lowest = message.id
                 self.cover(lowest, top)
@@ -935,6 +983,7 @@ class ChatExport:
             if MAX_TOTAL_SIZE and planned_bytes + size > MAX_TOTAL_SIZE:
                 record['photo' if 'photo' in record else 'file'] = NOT_INCLUDED['total_limit']
                 record['file_status'] = {'state': 'total_limit', 'size': size, 'limit': MAX_TOTAL_SIZE}
+                self.dirty.add(message_id)
                 media_bytes['left_out'] += 1
                 continue
             planned.append(message_id)
@@ -963,6 +1012,7 @@ class ChatExport:
                         media = getattr(message, attr, None)
                         if media is not None:
                             await export_media(message, media, attr, kind, self.exported[message_id], pbar, self.username, download=True)
+                            self.dirty.add(message_id)
                             break
                     pbar.update(1)
                     self.save()

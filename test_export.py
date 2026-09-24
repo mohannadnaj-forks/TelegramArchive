@@ -98,6 +98,8 @@ def install_fake_client(scenario: dict) -> None:
                     yield make_message(i)
                     if counters['listed'] == scenario.get('interrupt_after_listed'):
                         signal.raise_signal(signal.SIGINT)
+                    if counters['listed'] == scenario.get('kill_after_listed'):
+                        os._exit(9)
 
         async def get_messages(self, chat_id, message_ids):
             log({'call': 'get_messages', 'ids': list(message_ids)})
@@ -127,11 +129,12 @@ class ExportRun(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.dir, ignore_errors=True)
 
-    def run_bot(self, *args, **scenario):
+    def run_bot(self, *args, checkpoint_seconds=10, **scenario):
         open(self.log, 'w').close()
         scenario = {'count': 250, **scenario, 'log': self.log}
         env = {**os.environ, 'API_ID': '1', 'API_HASH': 'x', 'DOWNLOAD_PATH': '', 'MIN_FREE_DISK_MB': '0',
-               'FAKE_TELEGRAM': json.dumps(scenario), 'PYTHONIOENCODING': 'utf-8'}
+               'FAKE_TELEGRAM': json.dumps(scenario), 'PYTHONIOENCODING': 'utf-8',
+               'CHECKPOINT_SECONDS': str(checkpoint_seconds)}
         for kind in ('PHOTOS', 'VIDEOS'):
             env[f'MEDIA_EXPORT_{kind}'] = 'True'
         result = subprocess.run(
@@ -180,6 +183,7 @@ class FullExport(ExportRun):
         self.assertEqual(self.state()['listed'], [[1, 250]])
         self.assertEqual(self.state()['run']['status'], 'complete')
         self.assertTrue(os.path.exists(os.path.join(self.export_dir(), 'index.html')))
+        self.assertFalse(os.path.exists(os.path.join(self.export_dir(), 'export_journal.jsonl')))
 
     def test_a_later_run_lists_only_new_messages(self):
         self.run_bot(count=200)
@@ -228,6 +232,32 @@ class StoppingDuringListing(ExportRun):
         self.assertEqual([m['id'] for m in self.result()['messages']], list(range(1, 321)))
         self.assertEqual(self.state()['listed'], [[1, 320]])
         self.assertNotIn(275, self.listed_ids())
+
+
+class Killed(ExportRun):
+    def journal(self) -> str:
+        return os.path.join(self.export_dir(), 'export_journal.jsonl')
+
+    def test_a_killed_listing_is_recovered_from_the_journal(self):
+        self.assertEqual(self.run_bot(checkpoint_seconds=0, kill_after_listed=120), 9)
+        self.assertFalse(os.path.exists(os.path.join(self.export_dir(), 'result.json')))
+        with open(self.journal(), encoding='utf-8') as f:
+            saved = [json.loads(line)['id'] for line in f]
+        self.assertEqual(saved, list(range(250, 130, -1)))
+        self.assertEqual(self.state()['listed'], [[131, 250]])
+
+        self.assertEqual(self.run_bot(), 0, self.output)
+        self.assertIn('Recovered 120 messages', self.output)
+        self.assertEqual([m['id'] for m in self.result()['messages']], list(range(1, 251)))
+        self.assertFalse(set(self.listed_ids()) & set(range(131, 250)))
+        self.assertFalse(os.path.exists(self.journal()))
+
+    def test_a_line_cut_short_by_a_crash_is_ignored(self):
+        self.run_bot(checkpoint_seconds=0, kill_after_listed=50)
+        with open(self.journal(), 'a', encoding='utf-8') as f:
+            f.write('{"id": 1, "type": "mess')
+        self.assertEqual(self.run_bot(), 0, self.output)
+        self.assertEqual([m['id'] for m in self.result()['messages']], list(range(1, 251)))
 
 
 class StoppingDuringDownloads(ExportRun):
