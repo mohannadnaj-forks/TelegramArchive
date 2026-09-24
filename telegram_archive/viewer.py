@@ -22,6 +22,19 @@ def plain_text(value) -> str:
     return value or ''
 
 
+def split_chunks(messages: list) -> list:
+    # Chunks of VIEWER_CHUNK_MESSAGES, each extended to the end of an album it would otherwise cut.
+    parts, start = [], 0
+    while start < len(messages):
+        end = start + VIEWER_CHUNK_MESSAGES
+        while end < len(messages) and messages[end].get('media_group_id') is not None \
+                and messages[end].get('media_group_id') == messages[end - 1].get('media_group_id'):
+            end += 1
+        parts.append(messages[start:end])
+        start = end
+    return parts
+
+
 def viewer_index(chat_data: dict, updated: str | None) -> tuple:
     # The viewer loads data/index.js, then one data/<month>.js file at a time, all through <script> tags
     # so that it works from file:// without a server. Chunks hold the result.json records unchanged.
@@ -31,7 +44,7 @@ def viewer_index(chat_data: dict, updated: str | None) -> tuple:
     chunks, index_months = {}, []
     for key in sorted(months):
         messages = months[key]
-        parts = [messages[i:i + VIEWER_CHUNK_MESSAGES] for i in range(0, len(messages), VIEWER_CHUNK_MESSAGES)]
+        parts = split_chunks(messages)
         entry = {'key': key, 'count': len(messages), 'video': 0, 'photo': 0, 'other': 0, 'text': 0, 'missing': 0, 'chunks': []}
         for message in messages:
             status = message.get('file_status')

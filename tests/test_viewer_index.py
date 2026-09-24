@@ -20,6 +20,12 @@ class Index(unittest.TestCase):
         self.assertEqual(index['chat'], {'name': 'x'})
         self.assertIsNone(index['updated'])
 
+    def test_an_album_is_not_split_between_chunks(self):
+        messages = [message(i, media_group_id='7' if 1999 <= i <= 2002 else None) for i in range(1, 4001)]
+        index, chunks, search = viewer_index({'messages': messages}, None)
+        self.assertEqual([c['count'] for c in index['months'][0]['chunks']], [2002, 1998])
+        self.assertEqual(chunks['2024-01.2'][0]['id'], 2003)
+
     def test_kinds_and_missing_files_are_counted(self):
         messages = [
             message(1, photo='photos/a.jpg', file_status={'state': 'downloaded', 'size': 1}),
