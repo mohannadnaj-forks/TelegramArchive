@@ -829,6 +829,9 @@
             return { plain, entities };
         }
 
+        // File names may hold '#' or '%', which a URL would read as a fragment or an escape.
+        const fileUrl = p => p && p.split('/').map(encodeURIComponent).join('/');
+
         function fromTelegram(r) {
             const status = r.file_status || null;
             const media = [];
@@ -838,7 +841,7 @@
                 const path = ok ? (r.photo || r.file) : null;
                 const thumb = ok && r.thumbnail && r.thumbnail !== r.file && /\.(jpe?g|png|webp)$/i.test(r.thumbnail) ? r.thumbnail : null;
                 media.push({
-                    kind, path, thumb,
+                    kind, path: fileUrl(path), thumb: fileUrl(thumb),
                     width: r.width || null, height: r.height || null,
                     duration: r.duration_seconds || null,
                     size: status && status.size || null,
