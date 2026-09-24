@@ -31,7 +31,7 @@ from chats import ChatExporter
 logger = logging.getLogger(__name__)
 
 for stream in (sys.stdout, sys.stderr):
-    stream.reconfigure(errors='replace')
+    stream.reconfigure(encoding='utf-8', errors='replace')
 
 # Global checkpoint data for resuming
 
@@ -338,9 +338,10 @@ _export_dirs = {}
 def get_export_dir(username: str) -> str:
     # One directory per chat for the whole run; an earlier export of the same chat is continued.
     if username not in _export_dirs:
-        existing = sorted(glob.glob(f'{DOWNLOAD_PATH}/ChatExport_{username}_*')) if RESUME_ENABLED else []
+        pattern = os.path.join(glob.escape(DOWNLOAD_PATH), f'ChatExport_{glob.escape(username)}_*')
+        existing = sorted(glob.glob(pattern)) if RESUME_ENABLED else []
         today = datetime.now().strftime("%Y-%m-%d")
-        _export_dirs[username] = existing[-1] if existing else f'{DOWNLOAD_PATH}/ChatExport_{username}_{today}'
+        _export_dirs[username] = existing[-1] if existing else os.path.join(DOWNLOAD_PATH, f'ChatExport_{username}_{today}')
     return _export_dirs[username]
 
 
@@ -861,6 +862,11 @@ async def main():
             print(f"✅ Export of @{username} is up to date: {len(exported):,} messages, media {format_size(media_bytes['total'])} ({summary})")
             if media_bytes['left_out']:
                 print(f"💡 {media_bytes['left_out']} files were left out by --max-total-size ({format_size(MAX_TOTAL_SIZE)}); run again with a larger value to fetch them.")
+            missing = sum(m['file_status'].get('size') or 0 for m in archive.chat_data['messages']
+                          if m.get('file_status', {}).get('state') in ('total_limit', 'too_large'))
+            if missing:
+                print(f"📦 A complete export needs about {format_size(media_bytes['total'] + missing)} "
+                      f"({format_size(missing)} not downloaded yet, thumbnails not counted).")
 
 
 async def save_chat_photo(chat, chat_data: dict, export_directory: str) -> None:
@@ -929,6 +935,25 @@ def rebuild_viewers(chats: list) -> None:
 if args.viewer_only:
     rebuild_viewers(args.chats)
     sys.exit(0)
+
+def lock_session() -> None:
+    # Two clients on one session can lock its database or get the login revoked (AUTH_KEY_DUPLICATED).
+    global _session_lock
+    _session_lock = open(os.path.join(SESSION_DIR, 'my_bot.lock'), 'a+')
+    try:
+        if os.name == 'nt':
+            import msvcrt
+            _session_lock.seek(0)
+            msvcrt.locking(_session_lock.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(_session_lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        sys.exit("❌ Another export is already running with this Telegram login. "
+                 "Wait for it to finish, or name several chats in one command.")
+
+
+lock_session()
 
 app = Client(
     "my_bot",

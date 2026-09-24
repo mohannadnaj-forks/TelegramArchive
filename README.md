@@ -76,6 +76,7 @@ Chats are usernames, `t.me` links or numeric ids. Without `--output` the export 
 The first run asks for your phone number, the login code Telegram sends you, and your
 two-step password if you have one. The resulting session is stored in `.telegram/`
 (git-ignored); anyone holding that file can act as your account.
+Only one run can use the session at a time; to export several chats, name them all in one command.
 
 Each chat is exported to `ChatExport_<chat>_<date>/` with `result.json`, the media folders
 and an `index.html` viewer. The viewer opens straight from disk, no server needed; it reads
@@ -88,6 +89,15 @@ Each message's `file_status` in the JSON says whether its file was downloaded an
 why (`disabled`, `too_large`, `total_limit`, `failed`).
 Ctrl-C stops after the current message and saves progress; the run also stops with
 progress saved when free disk space falls below `MIN_FREE_DISK_MB`.
+
+### Windows
+Paths longer than 260 characters fail unless long paths are enabled. Enable them once from an
+administrator PowerShell:
+```powershell
+Set-ItemProperty HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem -Name LongPathsEnabled -Value 1
+```
+When the program is started from a `.cmd` file, Windows asks `Terminate batch job (Y/N)?`
+after Ctrl-C. Progress is already saved by then, so either answer is fine.
 
 ### Docker
 Set `CHATS` and `HOST_DOWNLOAD_PATH` in `.env`, then `make build-up`. Log in once with
