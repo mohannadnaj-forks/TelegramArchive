@@ -104,7 +104,8 @@ class ChannelRecords(RichChat):
         self.assertEqual(records[16]['contact_information'], {'phone_number': '+10000000000', 'fist_name': 'Ada', 'last_name': ''})
         self.assertEqual(records[16]['contact_vcard'], 'contacts/contact_16.vcf')
         with open(self.path('contacts', 'contact_16.vcf'), encoding='utf-8') as f:
-            self.assertIn('TEL;TYPE=CELL:+10000000000', f.read())
+            self.assertEqual(f.read(), 'BEGIN:VCARD\nVERSION:3.0\nFN;CHARSET=UTF-8:Ada\nN;CHARSET=UTF-8:;Ada;;;\n'
+                                       'TEL;TYPE=CELL:+10000000000\nEND:VCARD\n')
 
 
 class GroupRecords(RichChat):

@@ -587,12 +587,12 @@ def get_contact_data(
         vcard_path, vcard_relative_path = names
         msg_info['contact_vcard'] = vcard_relative_path
 
-        # convert to vcard
+        first, last = contact_data['fist_name'], contact_data['last_name']
         vcard = (
             'BEGIN:VCARD\n'
             'VERSION:3.0\n'
-            f'FN;CHARSET=UTF-8:{message.contact.first_name} {message.contact.last_name}\n'
-            f'N;CHARSET=UTF-8:{message.contact.last_name};{message.contact.first_name};;;\n'
+            f'FN;CHARSET=UTF-8:{" ".join(filter(None, (first, last)))}\n'
+            f'N;CHARSET=UTF-8:{last};{first};;;\n'
             f'TEL;TYPE=CELL:{message.contact.phone_number}\n'
             'END:VCARD\n'
         )
