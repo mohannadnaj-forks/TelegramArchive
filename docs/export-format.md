@@ -178,7 +178,7 @@ A checkpoint appends the records added or changed since the last one to
 `export_journal.jsonl`, one JSON record per line; a later line for the same `id` replaces an
 earlier one. `result.json` and the viewer are rewritten only when a run ends (finished,
 stopped or failed), and the journal is then deleted. If a run is killed, the next run (and
-`--viewer-only`) reads `result.json` plus the journal, ignoring a last line cut short.
+`--viewer-only`) reads `result.json` plus the journal, skipping a line cut short.
 While a run is going, `result.json` is therefore behind; `export_state.json` has the current
 counts.
 

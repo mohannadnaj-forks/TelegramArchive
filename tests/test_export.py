@@ -96,6 +96,15 @@ class Killed(ExportRun):
         self.assertEqual(self.run_bot(), 0, self.output)
         self.assertEqual([m['id'] for m in self.result()['messages']], list(range(1, 251)))
 
+    def test_records_saved_after_a_line_cut_short_survive_a_second_kill(self):
+        self.run_bot(checkpoint_seconds=0, kill_after_listed=50)
+        with open(self.journal(), 'a', encoding='utf-8') as f:
+            f.write('{"id": 1, "type": "mess')
+        self.assertEqual(self.run_bot(checkpoint_seconds=0, kill_after_listed=31), 9)
+        self.assertEqual(self.state()['listed'], [[171, 250]])
+        self.assertEqual(self.run_bot(), 0, self.output)
+        self.assertEqual([m['id'] for m in self.result()['messages']], list(range(1, 251)))
+
 
 class StoppingDuringDownloads(ExportRun):
     def test_ctrl_c_during_downloads_resumes_without_downloading_twice(self):

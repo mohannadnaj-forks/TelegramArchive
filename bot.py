@@ -223,7 +223,7 @@ JOURNAL_FILE = 'export_journal.jsonl'
 
 
 def read_journal(export_directory: str) -> dict:
-    # One message record per line; later lines replace earlier ones. A line cut short by a crash ends the read.
+    # One message record per line; later lines replace earlier ones. A line cut short by a crash is skipped.
     records = {}
     try:
         with open(os.path.join(export_directory, JOURNAL_FILE), encoding='utf-8') as f:
@@ -231,7 +231,7 @@ def read_journal(export_directory: str) -> dict:
                 try:
                     record = json.loads(line)
                 except ValueError:
-                    break
+                    continue
                 records[record['id']] = record
     except FileNotFoundError:
         pass
@@ -239,7 +239,16 @@ def read_journal(export_directory: str) -> dict:
 
 
 def append_journal(export_directory: str, records: list) -> None:
-    with open(os.path.join(export_directory, JOURNAL_FILE), 'a', encoding='utf-8') as f:
+    path = os.path.join(export_directory, JOURNAL_FILE)
+    try:
+        with open(path, 'rb') as f:
+            f.seek(-1, os.SEEK_END)
+            cut_short = f.read(1) != b'\n'
+    except OSError:
+        cut_short = False
+    with open(path, 'a', encoding='utf-8') as f:
+        if cut_short:
+            f.write('\n')
         for record in records:
             f.write(json.dumps(record, default=str) + '\n')
         f.flush()
