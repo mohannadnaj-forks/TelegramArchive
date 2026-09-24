@@ -30,6 +30,12 @@ class DownloadRetries(ExportRun):
         self.assertEqual(self.downloaded_files(), [VIDEO])
         self.assertEqual(self.file_states(), {'downloaded': 117})
 
+    def test_flood_waits_on_every_attempt_are_recorded_as_such(self):
+        self.assertEqual(self.run_bot(download_errors={VIDEO: ['flood:5'] * 5}), 0, self.output)
+        self.assertEqual(self.sleeps(), [5] * 5)
+        self.assertEqual(self.status_of(250)['state'], 'failed')
+        self.assertIn('FLOOD_WAIT', self.status_of(250)['error'])
+
     def test_errors_are_retried_with_growing_waits_then_recorded(self):
         self.assertEqual(self.run_bot(download_errors={VIDEO: ['network'] * 5}), 0, self.output)
         self.assertEqual(self.status_of(250), {'state': 'failed', 'error': 'network went away'})

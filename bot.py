@@ -127,6 +127,7 @@ async def download_media_with_flood_control(file_id: str, destination: str, pbar
                     continue
                 
         except FloodWait as e:
+            last_error = str(e)
             wait_time = e.value
             if wait_time > FLOOD_WAIT_MAX_SLEEP:
                 logger.error(f"❌ Required wait time ({wait_time}s) exceeds maximum ({FLOOD_WAIT_MAX_SLEEP}s)")
