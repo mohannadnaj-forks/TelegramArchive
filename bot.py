@@ -378,7 +378,8 @@ def get_export_dir(username: str) -> str:
     # One directory per chat for the whole run; an earlier export of the same chat is continued.
     if username not in _export_dirs:
         pattern = os.path.join(glob.escape(DOWNLOAD_PATH), f'ChatExport_{glob.escape(username)}_*')
-        existing = sorted(glob.glob(pattern)) if RESUME_ENABLED else []
+        own = re.compile(rf'ChatExport_{re.escape(username)}_\d{{4}}-\d{{2}}-\d{{2}}')
+        existing = sorted(p for p in glob.glob(pattern) if own.fullmatch(os.path.basename(p))) if RESUME_ENABLED else []
         today = datetime.now().strftime("%Y-%m-%d")
         _export_dirs[username] = existing[-1] if existing else os.path.join(DOWNLOAD_PATH, f'ChatExport_{username}_{today}')
     return _export_dirs[username]
