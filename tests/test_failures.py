@@ -68,6 +68,14 @@ class DownloadRetries(ExportRun):
         self.assertEqual(batches, [100, 17])
         self.assertEqual(self.calls('get_messages')[0]['ids'][0], 250)
 
+    def test_messages_are_fetched_again_when_their_file_references_are_30_minutes_old(self):
+        ticks = iter(range(0, 10 ** 9, 60))
+        self.assertEqual(self.run_bot(count=60, clock=lambda: next(ticks)), 0, self.output)
+        batches = [c['ids'] for c in self.calls('get_messages')]
+        self.assertGreater(len(batches), 1)
+        self.assertEqual(batches[1][0], batches[0][len(batches[0]) - len(batches[1])])
+        self.assertEqual(self.file_states(), {'downloaded': 20 + 8})
+
 
 class LowDiskSpace(ExportRun):
     def test_the_run_stops_before_downloading_and_keeps_its_listing(self):

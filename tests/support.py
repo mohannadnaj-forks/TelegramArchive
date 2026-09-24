@@ -121,7 +121,7 @@ class ExportChecks:
 class ExportRun(ExportChecks, unittest.TestCase):
     """Runs the program in this process. The exit code is what a user's shell would see; 9 for a kill."""
 
-    def run_bot(self, *args, checkpoint_seconds=10, env=None, chat=None, **scenario) -> int:
+    def run_bot(self, *args, checkpoint_seconds=10, env=None, chat=None, clock=None, **scenario) -> int:
         open(self.log, 'w').close()
         scenario = {'count': 250, **scenario, 'log': self.log}
         client_class = make_fake_client(scenario, kill=simulated_kill)
@@ -136,7 +136,8 @@ class ExportRun(ExportChecks, unittest.TestCase):
             with redirect_stdout(out), redirect_stderr(err):
                 cli.run(self.arguments(args, chat), settings,
                         client_factory=lambda s, session_dir: client_class(SESSION_NAME, workdir=session_dir),
-                        session_dir=os.path.join(self.dir, 'session'), sleep=recording_sleep(self.log))
+                        session_dir=os.path.join(self.dir, 'session'), sleep=recording_sleep(self.log),
+                        **({'clock': clock} if clock else {}))
         except SimulatedKill:
             code = 9
         except SystemExit as e:
