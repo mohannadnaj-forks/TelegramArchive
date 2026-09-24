@@ -164,7 +164,7 @@ async def download_media_with_flood_control(file_id: str, destination: str, pbar
 
 def load_existing_export(username: str) -> dict:
     """Load the existing export, with the records saved to the journal since result.json was last written."""
-    json_name = generate_json_name(username)
+    json_name = os.path.join(get_export_dir(username), 'result.json')
     data = load_result_json(json_name)
     journal = read_journal(os.path.dirname(json_name))
     if journal:
@@ -1099,7 +1099,7 @@ os.makedirs(SESSION_DIR, exist_ok=True)
 
 def rebuild_viewers(chats: list) -> None:
     for chat in chats:
-        if os.path.isdir(chat) and any(os.path.exists(os.path.join(chat, name)) for name in ('result.json', 'result_part1.json')):
+        if os.path.isdir(chat) and any(os.path.exists(os.path.join(chat, name)) for name in ('result.json', 'result_part1.json', JOURNAL_FILE)):
             _export_dirs[chat] = os.path.abspath(chat)
             username = chat
         else:
