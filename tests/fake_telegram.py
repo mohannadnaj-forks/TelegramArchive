@@ -194,8 +194,8 @@ def make_chat(scenario: dict, chat_id=None):
     return chat
 
 
-def install_fake_client(scenario: dict) -> type:
-    import pyrogram
+def make_fake_client(scenario: dict, kill=lambda: os._exit(9)) -> type:
+    """A client class for the scenario; kill() is what the scenario's kill_after_* points call."""
     from pyrogram.errors import FileReferenceExpired, FloodWait
 
     deleted = set(scenario.get('deleted', []))
@@ -280,7 +280,7 @@ def install_fake_client(scenario: dict) -> type:
                     if counters['listed'] == scenario.get('interrupt_after_listed'):
                         signal.raise_signal(signal.SIGINT)
                     if counters['listed'] == scenario.get('kill_after_listed'):
-                        os._exit(9)
+                        kill()
 
         async def get_messages(self, chat_id, message_ids):
             message_ids = list(message_ids)
@@ -309,15 +309,20 @@ def install_fake_client(scenario: dict) -> type:
             if counters['downloads'] == scenario.get('interrupt_after_downloads'):
                 signal.raise_signal(signal.SIGINT)
             if counters['downloads'] == scenario.get('kill_after_downloads'):
-                os._exit(9)
+                kill()
             return file_name
 
-    pyrogram.Client = FakeClient
     return FakeClient
 
 
-def install_fast_sleep(log_path: str) -> None:
-    # Retries and flood waits sleep for seconds or minutes; the fake records the wait and returns at once.
+def install_fake_client(scenario: dict) -> type:
+    import pyrogram
+    pyrogram.Client = make_fake_client(scenario)
+    return pyrogram.Client
+
+
+def recording_sleep(log_path: str):
+    """An asyncio.sleep that records the wait and returns at once."""
     import asyncio
     real_sleep = asyncio.sleep
 
@@ -328,4 +333,10 @@ def install_fast_sleep(log_path: str) -> None:
         await real_sleep(0)
         return result
 
-    asyncio.sleep = sleep
+    return sleep
+
+
+def install_fast_sleep(log_path: str) -> None:
+    # Retries and flood waits sleep for seconds or minutes; in a subprocess the fake replaces asyncio.sleep.
+    import asyncio
+    asyncio.sleep = recording_sleep(log_path)

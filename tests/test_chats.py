@@ -85,29 +85,5 @@ class ExportFolders(ExportRun):
         self.assertEqual(len(os.listdir(self.out)), 2)
 
 
-class SessionLock(ExportRun):
-    def test_a_second_run_on_the_same_login_stops_at_once(self):
-        lock_dir = os.path.join(self.program, '.telegram')
-        os.makedirs(lock_dir)
-        with open(os.path.join(lock_dir, 'my_bot.lock'), 'a+') as held:
-            if os.name == 'nt':
-                import msvcrt
-                held.seek(0)
-                msvcrt.locking(held.fileno(), msvcrt.LK_NBLCK, 1)
-            else:
-                import fcntl
-                fcntl.flock(held, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            self.assertEqual(self.run_bot(count=3), 1)
-        self.assertIn('Another export is already running with this Telegram login', self.output)
-        self.assertFalse(os.path.exists(self.out))
-        self.assertEqual(self.calls('client'), [])
-
-    def test_the_session_lives_next_to_the_program(self):
-        self.assertEqual(self.run_bot(count=3), 0, self.output)
-        [client] = self.calls('client')
-        self.assertEqual(client['name'], 'my_bot')
-        self.assertEqual(os.path.realpath(client['workdir']), os.path.realpath(os.path.join(self.program, '.telegram')))
-
-
 if __name__ == '__main__':
     unittest.main()

@@ -6,13 +6,13 @@ with the export; this bounds the growth per message.
 import os
 import unittest
 
-from tests.support import ExportRun
+from tests.support import SubprocessRun
 
 COUNT = 200_000
 
 
 @unittest.skipUnless(os.environ.get('TELEGRAM_ARCHIVE_SLOW_TESTS'), 'slow; set TELEGRAM_ARCHIVE_SLOW_TESTS=1')
-class Scale(ExportRun):
+class Scale(SubprocessRun):
     def test_listing_memory_grows_by_less_than_2_kb_per_message(self):
         code = self.run_bot(count=COUNT, quiet=True, memory_every=COUNT // 10,
                             env={'MEDIA_EXPORT_PHOTOS': 'False', 'MEDIA_EXPORT_VIDEOS': 'False'})

@@ -1,8 +1,7 @@
-"""Runs bot.py end to end against the fake Telegram client (tests/fake_telegram.py), without a network or a login.
+"""Whole runs against the fake Telegram client (tests/fake_telegram.py): listing, resuming, stopping, limits.
 
-Each run is a subprocess on a copy of the program in a temporary directory, so the session lock
-and the Ctrl-C handling behave as they do for real. The fake chat's messages are numbered 1..count,
-one hour apart; every third has a photo and every fifth a video.
+The fake chat's messages are numbered 1..count, one hour apart; every third has a photo and every
+fifth a video. test_end_to_end.py repeats the Ctrl-C and kill cases in a real subprocess.
 """
 import json
 import os
