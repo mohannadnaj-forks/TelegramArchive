@@ -51,7 +51,7 @@ class ExportFolder:
         if journal:
             messages = {m['id']: m for m in data.get('messages', [])}
             messages.update(journal)
-            data['messages'] = list(messages.values())
+            data['messages'] = [messages[i] for i in sorted(messages)]
             logger.info(f"📂 Recovered {len(journal):,} messages saved since result.json was last written")
         return data
 

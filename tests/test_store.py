@@ -77,6 +77,11 @@ class Saving(unittest.TestCase):
         self.folder.remove_journal()
         self.assertEqual(len(self.folder.load()['messages']), 3)
 
+    def test_records_from_the_journal_are_in_id_order(self):
+        self.folder.write_result(self.chat(3), None)
+        self.folder.append_journal([{'id': 9}, {'id': 7}, {'id': 2, 'text': 'edited'}])
+        self.assertEqual([m['id'] for m in self.folder.load()['messages']], [1, 2, 3, 7, 9])
+
     def test_a_line_cut_short_is_skipped_and_the_next_append_starts_a_new_line(self):
         self.folder.append_journal([{'id': 1}])
         with open(self.folder.journal_path, 'a', encoding='utf-8') as f:
