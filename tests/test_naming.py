@@ -1,13 +1,7 @@
-import os
-import sys
 import unittest
 from types import SimpleNamespace
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.argv = ['bot.py', 'x']
-_ns = {}
-exec(compile(open(os.path.join(ROOT, 'bot.py'), encoding='utf-8').read().split('def parse_chat(')[0], 'bot', 'exec'), _ns)
-media_file_name = _ns['media_file_name']
+from telegram_archive.media import media_file_name
 
 
 def media(file_name, mime_type='video/mp4'):

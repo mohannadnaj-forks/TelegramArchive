@@ -23,7 +23,7 @@ ChatExport_<chat>_<YYYY-MM-DD>/
 `<chat>` is the chat's username, or its numeric id when it has none. The date is
 the day the export was first started; later runs continue the same directory.
 
-File names are built from the message id (see `media_file_name` in `bot.py`, pinned by
+File names are built from the message id (see `media_file_name` in `telegram_archive/media.py`, pinned by
 `tests/test_naming.py`): `<kind>_<message id><ext>` when the file has no name of its own, or
 `<message id>_<original name, sanitised>` when it has one. Names use only characters valid
 on exFAT, NTFS and Windows. The name is the same on every run, which is what resume relies on.
@@ -42,7 +42,7 @@ on exFAT, NTFS and Windows. The name is the same on every run, which is what res
 | field | notes |
 |---|---|
 | `name` | channel/group title, or the user's first name for a private chat |
-| `type` | `public_channel`, `public_group`, `public_supergroup` or `personal_chat` (private groups and channels are a TODO in `Archive.fill_chat_data`) |
+| `type` | `public_channel`, `public_group`, `public_supergroup` or `personal_chat` (private groups and channels are a TODO in `chat_fields` in `telegram_archive/records.py`) |
 | `id` | for channels and groups, a string without the API's `-100` prefix; for private chats, the numeric user id |
 | `username` | the chat's public username, when it has one |
 | `description` | channel/group description, or the user's bio |
@@ -98,7 +98,7 @@ video note, audio, voice, document.
 | `file_status` | see below |
 
 When the file is not on disk, `photo`/`file` holds a sentence explaining why instead of a
-path (`NOT_INCLUDED` in `configs.py`), for compatibility with Telegram Desktop's export.
+path (`NOT_INCLUDED` in `telegram_archive/file_status.py`), for compatibility with Telegram Desktop's export.
 Use `file_status` to decide; don't parse the sentence.
 
 Telegram's video thumbnails are small (320 px on the long side in the test exports). Photo
