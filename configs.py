@@ -46,7 +46,6 @@ ZERO_BYTES_MAX_RETRIES = int(os.environ.get("ZERO_BYTES_MAX_RETRIES", "2"))
 SUSPECTED_FLOOD_WAIT_DURATION = int(os.environ.get("SUSPECTED_FLOOD_WAIT_DURATION", "300"))
 
 # Checkpointing
-CHECKPOINT_EVERY = int(os.environ.get("CHECKPOINT_EVERY", "50"))
 RESUME_ENABLED = str_to_bool(os.environ.get("RESUME_ENABLED", "True"))
 
 # File safety
@@ -55,6 +54,7 @@ MIN_FREE_DISK_MB = int(os.environ.get("MIN_FREE_DISK_MB", "2048"))
 
 FILE_NOT_FOUND = '(File not included. Change data exporting settings to download.)'
 NOT_INCLUDED = {
+    'pending': '(File not downloaded yet. Run the export again to continue.)',
     'disabled': FILE_NOT_FOUND,
     'too_large': '(File exceeds maximum size. Change data exporting settings to download.)',
     'total_limit': '(File not included. Total media size limit reached; run again with a larger --max-total-size.)',

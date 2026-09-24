@@ -9,6 +9,7 @@ format as it is, including its gaps.
 ChatExport_<chat>_<YYYY-MM-DD>/
   result.json          the export (or result_part1.json, result_part2.json, ... when JSON_FILE_PAGE_SIZE is set;
                        each part has the top-level fields below and a consecutive run of the messages)
+  export_state.json    progress of the export, for resuming and for other programs to read (see below)
   chat_photo.jpg       the chat's picture, downloaded once
   index.html, data/    the viewer, regenerated from result.json on every run and by --viewer-only:
                        data/index.js, one data/<YYYY-MM>.js per month (records unchanged), data/search.js
@@ -44,7 +45,6 @@ on exFAT, NTFS and Windows. The name is the same on every run, which is what res
 | `username` | the chat's public username, when it has one |
 | `description` | channel/group description, or the user's bio |
 | `photo` | `chat_photo.jpg` when the picture was downloaded |
-| `listing_complete` | `true` once a run without `--since`/`--until` has listed and processed the whole history; later runs then list only newer messages (see below) |
 | `messages` | sorted by `id`, ascending |
 
 Not recorded: member count, or when the export ran.
@@ -110,6 +110,7 @@ Present on every message that has media.
 | `state` | other fields | meaning |
 |---|---|---|
 | `downloaded` | `size` | the file is on disk at `photo`/`file` |
+| `pending` | `size` | wanted, not downloaded yet; the run that listed it was stopped before its downloads finished |
 | `disabled` | `setting` | that media kind is switched off, e.g. `MEDIA_EXPORT_PHOTOS` |
 | `too_large` | `size`, `limit` | over `--max-file-size` |
 | `total_limit` | `size`, `limit` | would have passed `--max-total-size` |
@@ -151,12 +152,53 @@ same timestamp.
 
 ## How runs update the export
 
-The first run, and any run with `--since`, `--until` or `--refresh`, lists the requested
-history and processes every listed message (text and entities refreshed, files checked).
-After a complete listing, a normal run lists only messages newer than the newest exported
-one, and re-fetches by id the exported messages whose `file_status` is not `downloaded`,
-so raised limits or failed downloads are still picked up. Edits to and deletions of older
-messages are then only picked up with `--refresh`.
+A run has two passes.
+
+1. **Listing** walks the history from newest to oldest, within `--since`/`--until` when given,
+   and writes a record for every message it has not listed before. A file that is wanted and
+   not on disk is recorded as `pending`. Progress is saved at most once a minute and when the
+   run stops, so a stopped listing keeps what it listed.
+2. **Downloading** goes through the records whose file is wanted (`pending`, `failed`,
+   `total_limit`, or `disabled`/`too_large` when the settings now allow it), newest first,
+   fetches those messages again by id, and downloads their files. `--max-total-size` is
+   applied here, so it keeps the newest files.
+
+The id ranges already listed are kept in `export_state.json`, and later runs skip them: a
+stopped listing continues below what it reached, and a finished export lists only messages
+posted since. Edits to and deletions of messages already listed are only picked up with
+`--refresh`, which lists the whole history again; a stopped `--refresh` starts over.
+
+An export without `export_state.json` is listed again in full on its next run, keeping its files.
+
+### `export_state.json`
+
+```json
+{
+  "listed": [[1, 5148]],
+  "run": {
+    "status": "complete",
+    "stage": "complete",
+    "pid": 4242,
+    "started": "2026-09-24T04:50:22",
+    "updated": "2026-09-24T05:10:02",
+    "messages_in_chat": 5148,
+    "listed_this_run": 12,
+    "messages_exported": 5148,
+    "files": {"downloaded": {"count": 1176, "bytes": 4003020}, "pending": {"count": 3, "bytes": 10240}}
+  }
+}
+```
+
+| field | notes |
+|---|---|
+| `listed` | inclusive message id ranges already listed, merged; a range starting at `1` reaches the beginning of the chat |
+| `run.status` | `running`, `stopped` (Ctrl-C), `failed` (an error, including low disk space) or `complete` |
+| `run.stage` | `listing`, `downloading` or `complete`: where the run was when it was last saved |
+| `run.messages_in_chat` | Telegram's count at the start of the run, or `null` if it could not be read |
+| `run.files` | count and bytes of files per `file_status` state |
+
+The file is written after `result.json`, so it never claims more than `result.json` holds.
+Deleting it only makes the next run list the history again.
 
 ## Scale reference
 

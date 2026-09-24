@@ -22,7 +22,7 @@ from pyrogram.file_id import FileId
 from configs import (
     API_ID, API_HASH, MEDIA_EXPORT, FILE_NOT_FOUND, NOT_INCLUDED, MIN_FREE_DISK_MB, 
     JSON_FILE_PAGE_SIZE, DOWNLOAD_PATH, FLOOD_WAIT_MAX_SLEEP,
-    DOWNLOAD_MAX_RETRIES, CHECKPOINT_EVERY, RESUME_ENABLED,
+    DOWNLOAD_MAX_RETRIES, RESUME_ENABLED,
     ATOMIC_WRITES, ZERO_BYTES_MAX_RETRIES,
     SUSPECTED_FLOOD_WAIT_DURATION
 )
@@ -39,7 +39,7 @@ class LowDiskSpace(Exception):
     pass
 
 
-media_bytes = {'total': 0, 'left_out': 0, 'counted': set()}
+media_bytes = {'total': 0, 'left_out': 0}
 
 
 def format_size(size: int) -> str:
@@ -303,7 +303,7 @@ class Archive:
         for attr, kind in MEDIA_KINDS.items():
             media = getattr(message, attr)
             if media is not None:
-                await export_media(message, media, attr, kind, msg_info, pbar, self.username)
+                await export_media(message, media, attr, kind, msg_info, pbar, self.username, download=False)
                 break
         if message.contact is not None:
             names = get_contact_name(self.username, message.id)
@@ -361,7 +361,7 @@ MEDIA_FIELDS = (('mime_type', 'mime_type'), ('duration', 'duration_seconds'), ('
                 ('height', 'height'), ('performer', 'performer'), ('title', 'title'), ('emoji', 'sticker_emoji'))
 
 
-async def export_media(message: Message, media, attr: str, kind: tuple, msg_info: dict, pbar: tqdm, username: str) -> None:
+async def export_media(message: Message, media, attr: str, kind: tuple, msg_info: dict, pbar: tqdm, username: str, download: bool) -> None:
     switch, folder, media_type, fallback_ext = kind
     if media_type:
         msg_info['media_type'] = media_type
@@ -380,13 +380,12 @@ async def export_media(message: Message, media, attr: str, kind: tuple, msg_info
 
     if os.path.exists(path):
         status = {'state': 'downloaded', 'size': os.path.getsize(path)}
-        if f'{folder}/{name}' not in media_bytes['counted']:
-            media_bytes['counted'].add(f'{folder}/{name}')
-            media_bytes['total'] += status['size']
     elif not MEDIA_EXPORT[switch]:
         status = {'state': 'disabled', 'setting': f'MEDIA_EXPORT_{switch.upper()}'}
     elif MAX_FILE_SIZE and size > MAX_FILE_SIZE:
         status = {'state': 'too_large', 'size': size, 'limit': MAX_FILE_SIZE}
+    elif not download:
+        status = {'state': 'pending', 'size': size}
     elif MAX_TOTAL_SIZE and media_bytes['total'] + size > MAX_TOTAL_SIZE:
         status = {'state': 'total_limit', 'size': size, 'limit': MAX_TOTAL_SIZE}
         media_bytes['left_out'] += 1
@@ -742,131 +741,257 @@ async def main():
             title = getattr(chat, 'title', None) or getattr(chat, 'first_name', 'Unknown')
             print(f"📋 Exporting: {title} (@{getattr(chat, 'username', None) or chat.id})")
 
-            archive = Archive(CHAT_IDS)
-            archive.fill_chat_data(chat)
-            username = chat.username or str(chat.id)
-            archive.username = username
-            json_name = generate_json_name(username)
-            export_directory = os.path.dirname(json_name)
+            if not await ChatExport(chat, cid).run():
+                return
 
-            # Messages already exported are kept (also ones since deleted or outside this run's date range)
-            # and re-checked against the current settings and the files on disk.
-            existing = load_existing_export(username) if RESUME_ENABLED else {}
-            exported = {m['id']: m for m in existing.get('messages', [])}
-            for key, value in existing.items():
-                if key != 'messages':
-                    archive.chat_data.setdefault(key, value)
-            archive.chat_data['messages'] = list(exported.values())
-            await save_chat_photo(chat, archive.chat_data, export_directory)
-            if exported:
-                print(f"📂 Continuing the existing export of @{username} ({len(exported):,} messages)")
-            media_bytes['counted'] = {
-                m.get('photo') or m.get('file') for m in exported.values()
-                if m.get('file_status', {}).get('state') == 'downloaded'
-            }
-            media_bytes['total'] = sum(
-                m['file_status'].get('size') or 0 for m in exported.values()
-                if m.get('file_status', {}).get('state') == 'downloaded'
-            )
-            media_bytes['left_out'] = 0
 
-            # Once a whole listing has been processed, later runs list only messages newer than the newest
-            # exported one, plus the exported messages whose file is still to be downloaded.
-            full_listing = SINCE is None and UNTIL is None
-            incremental = bool(exported) and archive.chat_data.get('listing_complete') and full_listing and not REFRESH
-            newest = max(exported) if exported else 0
-            if incremental:
-                print(f"📥 Fetching messages newer than #{newest} for @{username} (--refresh re-reads the whole history)...")
-            else:
-                print(f"📥 Fetching message history for @{username}...")
-            fetch_start_time = time.time()
-            all_messages = []
-            try:
-                async for message in app.get_chat_history(cid, offset_date=UNTIL):
+STATE_FILE = 'export_state.json'
+
+
+def merge_ranges(ranges: list) -> list:
+    merged = []
+    for low, high in sorted(ranges):
+        if merged and low <= merged[-1][1] + 1:
+            merged[-1][1] = max(merged[-1][1], high)
+        else:
+            merged.append([low, high])
+    return merged
+
+
+def load_state(export_directory: str) -> dict:
+    try:
+        with open(os.path.join(export_directory, STATE_FILE), encoding='utf-8') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {}
+    except Exception as e:
+        logger.warning(f"⚠️ Failed to read {STATE_FILE}; the history is listed again: {e}")
+        return {}
+
+
+def write_state(export_directory: str, state: dict) -> None:
+    path = os.path.join(export_directory, STATE_FILE)
+    with open(f'{path}.tmp', 'w', encoding='utf-8') as f:
+        json.dump(state, f, indent=2)
+    os.replace(f'{path}.tmp', path)
+
+
+def file_states(messages) -> dict:
+    states = {}
+    for m in messages:
+        status = m.get('file_status')
+        if status:
+            entry = states.setdefault(status['state'], {'count': 0, 'bytes': 0})
+            entry['count'] += 1
+            entry['bytes'] += status.get('size') or 0
+    return states
+
+
+def downloaded_bytes(messages) -> int:
+    sizes = {m.get('photo') or m.get('file'): m['file_status'].get('size') or 0
+             for m in messages if m.get('file_status', {}).get('state') == 'downloaded'}
+    return sum(sizes.values())
+
+
+def now() -> str:
+    return datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
+
+
+class ChatExport:
+    # A run has two passes. Listing walks the history newest to oldest and writes each message's record,
+    # marking wanted files 'pending'; the listed id ranges are kept in export_state.json so a stopped
+    # listing continues where it stopped. Downloading then fetches pending files by message id.
+
+    def __init__(self, chat, cid) -> None:
+        self.chat = chat
+        self.cid = cid
+        self.archive = Archive(CHAT_IDS)
+        self.archive.fill_chat_data(chat)
+        self.username = chat.username or str(chat.id)
+        self.archive.username = self.username
+        self.json_name = generate_json_name(self.username)
+        self.directory = os.path.dirname(self.json_name)
+
+        # Messages already exported are kept, also ones since deleted or outside this run's date range.
+        existing = load_existing_export(self.username) if RESUME_ENABLED else {}
+        self.exported = {m['id']: m for m in existing.get('messages', [])}
+        for key, value in existing.items():
+            if key != 'messages':
+                self.archive.chat_data.setdefault(key, value)
+        self.state = load_state(self.directory) if self.exported else {}
+        self.state.setdefault('listed', [])
+        self.state['run'] = {'status': 'running', 'stage': 'listing', 'pid': os.getpid(), 'started': now()}
+        self.written_at = time.time()
+
+    def save(self, force: bool = False) -> None:
+        if not force and time.time() - self.written_at < CHECKPOINT_MIN_SECONDS:
+            return
+        self.archive.chat_data['messages'] = list(self.exported.values())
+        write_export(self.archive.chat_data, self.json_name)
+        self.state['run'].update(updated=now(), messages_exported=len(self.exported),
+                                 files=file_states(self.exported.values()))
+        write_state(self.directory, self.state)
+        self.written_at = time.time()
+
+    def cover(self, low: int, high: int) -> None:
+        self.state['listed'] = merge_ranges(self.state['listed'] + [[low, high]])
+
+    async def run(self) -> bool:
+        await save_chat_photo(self.chat, self.archive.chat_data, self.directory)
+        if self.exported:
+            print(f"📂 Continuing the existing export of @{self.username} ({len(self.exported):,} messages)")
+        failure = None
+        try:
+            await self.list_messages()
+            self.state['run']['stage'] = 'downloading'
+            await self.download_media()
+            self.state['run']['stage'] = 'complete'
+        except (KeyboardInterrupt, Exception) as e:
+            if not isinstance(e, KeyboardInterrupt):
+                failure = e
+                logger.error(f"❌ Stopping: {e}")
+        complete = self.state['run']['stage'] == 'complete'
+        self.state['run']['status'] = 'complete' if complete else 'failed' if failure else 'stopped'
+        self.save(force=True)
+        generate_index_html(self.directory, self.archive.chat_data)
+        self.report()
+        if failure is not None and not isinstance(failure, LowDiskSpace):
+            raise failure
+        return complete
+
+    async def list_messages(self) -> None:
+        skip = [] if REFRESH else [list(r) for r in self.state['listed']]
+        try:
+            in_chat = await app.get_chat_history_count(self.cid)
+        except Exception:
+            in_chat = None
+        self.state['run'].update(messages_in_chat=in_chat, listed_this_run=0)
+        known = f" ({in_chat:,} in the chat, {len(self.exported):,} in the export)" if in_chat is not None else ''
+        if skip:
+            print(f"📥 Listing messages of @{self.username} not listed before{known}; --refresh re-reads the whole history")
+        else:
+            print(f"📥 Listing messages of @{self.username}{known}")
+        started = time.time()
+        bar = tqdm(disable=True)
+        bound, offset_date = 0, UNTIL
+        while True:
+            top, lowest, covered = bound or None, None, None
+            async for message in app.get_chat_history(self.cid, max_id=bound, offset_date=offset_date):
+                if shutdown_requested:
+                    raise KeyboardInterrupt
+                if bound and message.id > bound:
+                    continue
+                if SINCE is not None and message.date is not None and message.date < SINCE:
+                    return
+                covered = next((r for r in skip if r[0] <= message.id <= r[1]), None)
+                if covered:
+                    break
+                msg_info = {}
+                await self.archive.process_message(self.chat, message, msg_info, bar)
+                self.exported[message.id] = msg_info
+                top = top or message.id
+                lowest = message.id
+                self.cover(lowest, top)
+                listed = self.state['run']['listed_this_run'] = self.state['run']['listed_this_run'] + 1
+                if listed % 1000 == 0:
+                    print(f"📥 Listed {listed:,} messages this run, back to {message.date:%Y-%m-%d} ({time.time() - started:.0f}s)")
+                self.save()
+            if covered is None:
+                # The history ended: everything below what was listed is covered too.
+                if top:
+                    self.cover(1, lowest or top)
+                return
+            if top:
+                self.cover(covered[1] + 1, top)
+            bound, offset_date = covered[0] - 1, None
+            if bound < 1:
+                return
+
+    def wanted(self, record: dict) -> bool:
+        status = record.get('file_status') or {}
+        state = status.get('state')
+        if state in ('pending', 'failed', 'total_limit'):
+            pass
+        elif state == 'disabled':
+            if not MEDIA_EXPORT.get(status.get('setting', '').removeprefix('MEDIA_EXPORT_').lower(), False):
+                return False
+        elif state == 'too_large':
+            if MAX_FILE_SIZE and (status.get('size') or 0) > MAX_FILE_SIZE:
+                return False
+        else:
+            return False
+        date = datetime.strptime(record['date'], '%Y-%m-%dT%H:%M:%S')
+        return (SINCE is None or date >= SINCE) and (UNTIL is None or date < UNTIL)
+
+    async def download_media(self) -> None:
+        media_bytes['total'] = downloaded_bytes(self.exported.values())
+        media_bytes['left_out'] = 0
+        planned, planned_bytes = [], media_bytes['total']
+        for message_id in sorted(self.exported, reverse=True):
+            record = self.exported[message_id]
+            if not self.wanted(record):
+                continue
+            size = record['file_status'].get('size') or 0
+            if MAX_TOTAL_SIZE and planned_bytes + size > MAX_TOTAL_SIZE:
+                record['photo' if 'photo' in record else 'file'] = NOT_INCLUDED['total_limit']
+                record['file_status'] = {'state': 'total_limit', 'size': size, 'limit': MAX_TOTAL_SIZE}
+                media_bytes['left_out'] += 1
+                continue
+            planned.append(message_id)
+            planned_bytes += size
+        if not planned:
+            return
+        free = shutil.disk_usage(self.directory).free
+        print(f"📦 {len(planned):,} files to download, {format_size(planned_bytes - media_bytes['total'])}; {format_size(free)} free on disk")
+        if media_bytes['left_out']:
+            print(f"💡 --max-total-size {format_size(MAX_TOTAL_SIZE)} leaves out {media_bytes['left_out']:,} more files")
+        pbar = tqdm(total=len(planned), desc=f"Downloading @{self.username}", unit="file")
+        try:
+            for start in range(0, len(planned), FILE_REFERENCE_CHUNK):
+                chunk = planned[start:start + FILE_REFERENCE_CHUNK]
+                messages, fetched_at = {}, 0
+                for position, message_id in enumerate(chunk):
                     if shutdown_requested:
                         raise KeyboardInterrupt
-                    if SINCE is not None and message.date is not None and message.date < SINCE:
-                        break
-                    if incremental and message.id <= newest:
-                        break
-                    all_messages.append(message)
-                    if len(all_messages) % 1000 == 0:
-                        print(f"📥 Fetched {len(all_messages):,} messages... ({time.time() - fetch_start_time:.0f}s)")
-                all_messages.reverse()
-                if incremental:
-                    listed = len(all_messages)
-                    pending = [i for i, m in exported.items() if m.get('file_status', {}).get('state') not in (None, 'downloaded')]
-                    for start in range(0, len(pending), FILE_REFERENCE_CHUNK):
-                        if shutdown_requested:
-                            raise KeyboardInterrupt
-                        fetched = await app.get_messages(chat.id, pending[start:start + FILE_REFERENCE_CHUNK])
-                        all_messages.extend(m for m in fetched if m is not None and not m.empty)
-                    all_messages.sort(key=lambda m: m.id)
-                    print(f"📥 {listed:,} new messages; {len(all_messages) - listed:,} exported messages with files still to download")
-            except KeyboardInterrupt:
-                print("🛑 Fetch interrupted; nothing was written. The message list is fetched again on the next run.")
-                return
-            print(f"✅ Fetched {len(all_messages):,} messages in {time.time() - fetch_start_time:.1f}s")
-            fetched_at = time.time()
+                    # File references inside fetched messages expire, so the rest of a chunk is re-read when they get old.
+                    if time.time() - fetched_at > FILE_REFERENCE_MAX_AGE:
+                        fresh = await app.get_messages(self.chat.id, chunk[position:])
+                        messages = {m.id: m for m in fresh if m is not None and not m.empty}
+                        fetched_at = time.time()
+                    message = messages.get(message_id)
+                    for attr, kind in MEDIA_KINDS.items():
+                        media = getattr(message, attr, None)
+                        if media is not None:
+                            await export_media(message, media, attr, kind, self.exported[message_id], pbar, self.username, download=True)
+                            break
+                    pbar.update(1)
+                    self.save()
+        finally:
+            pbar.close()
 
-            pbar = tqdm(all_messages, desc=f"Processing @{username}", unit="message")
-            processed_count = 0
-            written_at = time.time()
-            interrupted = False
-            failure = None
-            try:
-                for index, message in enumerate(pbar):
-                    if shutdown_requested:
-                        raise KeyboardInterrupt
-                    # File references inside fetched messages expire, so long runs re-read them in chunks.
-                    if index % FILE_REFERENCE_CHUNK == 0 and time.time() - fetched_at > FILE_REFERENCE_MAX_AGE:
-                        chunk = all_messages[index:index + FILE_REFERENCE_CHUNK]
-                        fresh = await app.get_messages(chat.id, [m.id for m in chunk])
-                        for offset, fresh_message in enumerate(fresh):
-                            if fresh_message is not None and not fresh_message.empty:
-                                all_messages[index + offset] = fresh_message
-                        message = all_messages[index]
-                    msg_info = {}
-                    await archive.process_message(chat, message, msg_info, pbar)
-                    exported[message.id] = msg_info
-                    processed_count += 1
-                    if processed_count % CHECKPOINT_EVERY == 0 and time.time() - written_at >= CHECKPOINT_MIN_SECONDS:
-                        archive.chat_data['messages'] = list(exported.values())
-                        write_export(archive.chat_data, json_name)
-                        written_at = time.time()
-            except (KeyboardInterrupt, Exception) as e:
-                if not isinstance(e, KeyboardInterrupt):
-                    failure = e
-                    logger.error(f"❌ Stopping: {e}")
-                pbar.close()
-                interrupted = True
-
-            archive.chat_data['messages'] = list(exported.values())
-            if full_listing and not interrupted:
-                archive.chat_data['listing_complete'] = True
-            write_export(archive.chat_data, json_name)
-            generate_index_html(export_directory, archive.chat_data)
-
-            states = {}
-            for m in archive.chat_data['messages']:
-                state = m.get('file_status', {}).get('state')
-                if state:
-                    states[state] = states.get(state, 0) + 1
-            summary = ', '.join(f"{n} {state.replace('_', ' ')}" for state, n in sorted(states.items()))
-            if interrupted:
-                print(f"💾 Progress saved for @{username}: {processed_count:,} of {len(all_messages):,} messages this run ({summary})")
-                print("💡 Run the same command again to continue.")
-                if failure is not None and not isinstance(failure, LowDiskSpace):
-                    raise failure
-                return
-            print(f"✅ Export of @{username} is up to date: {len(exported):,} messages, media {format_size(media_bytes['total'])} ({summary})")
-            if media_bytes['left_out']:
-                print(f"💡 {media_bytes['left_out']} files were left out by --max-total-size ({format_size(MAX_TOTAL_SIZE)}); run again with a larger value to fetch them.")
-            missing = sum(m['file_status'].get('size') or 0 for m in archive.chat_data['messages']
-                          if m.get('file_status', {}).get('state') in ('total_limit', 'too_large'))
-            if missing:
-                print(f"📦 A complete export needs about {format_size(media_bytes['total'] + missing)} "
-                      f"({format_size(missing)} not downloaded yet, thumbnails not counted).")
+    def report(self) -> None:
+        messages = self.archive.chat_data['messages']
+        states = file_states(messages)
+        summary = ', '.join(f"{v['count']} {state.replace('_', ' ')}" for state, v in sorted(states.items()))
+        run = self.state['run']
+        in_chat = run.get('messages_in_chat')
+        held = f"{len(self.exported):,}" + (f" of about {in_chat:,}" if in_chat else '')
+        if run['stage'] == 'listing':
+            print(f"💾 Progress saved for @{self.username}: {run.get('listed_this_run', 0):,} messages listed this run; "
+                  f"the export holds {held} messages. Media is downloaded after the listing.")
+        elif run['stage'] == 'downloading':
+            print(f"💾 Progress saved for @{self.username}: {held} messages ({summary})")
+        if run['stage'] != 'complete':
+            print("💡 Run the same command again to continue.")
+            return
+        total = downloaded_bytes(messages)
+        print(f"✅ Export of @{self.username} is up to date: {len(self.exported):,} messages, media {format_size(total)} ({summary})")
+        if media_bytes['left_out']:
+            print(f"💡 {media_bytes['left_out']} files were left out by --max-total-size ({format_size(MAX_TOTAL_SIZE)}); run again with a larger value to fetch them.")
+        missing = sum(v['bytes'] for state, v in states.items() if state in ('total_limit', 'too_large'))
+        if missing:
+            print(f"📦 A complete export needs about {format_size(total + missing)} "
+                  f"({format_size(missing)} not downloaded yet, thumbnails not counted).")
 
 
 async def save_chat_photo(chat, chat_data: dict, export_directory: str) -> None:
