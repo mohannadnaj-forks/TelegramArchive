@@ -15,6 +15,9 @@ scenario = json.loads(os.environ['FAKE_TELEGRAM'])
 install_fake_client(scenario)
 if scenario.get('fast_sleep', True):
     install_fast_sleep(scenario['log'])
+if scenario.get('memory_every'):
+    import tracemalloc
+    tracemalloc.start()
 sys.argv = [os.path.join(program, 'bot.py'), *sys.argv[2:]]
 sys.path[0] = program
 os.chdir(program)

@@ -268,7 +268,14 @@ def install_fake_client(scenario: dict) -> type:
                         fail(action)
                     if counters['listed'] == scenario.get('fail_after_listed'):
                         fail('network')
-                    log({'call': 'yield', 'id': i})
+                    if not scenario.get('quiet'):
+                        log({'call': 'yield', 'id': i})
+                    if scenario.get('memory_every') and counters['listed'] % scenario['memory_every'] == 0:
+                        import time
+                        import tracemalloc
+                        current, peak = tracemalloc.get_traced_memory()
+                        log({'call': 'memory', 'listed': counters['listed'], 'current': current, 'peak': peak,
+                             'time': time.perf_counter()})
                     yield make_message(i)
                     if counters['listed'] == scenario.get('interrupt_after_listed'):
                         signal.raise_signal(signal.SIGINT)
