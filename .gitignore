@@ -147,3 +147,6 @@ data/
 
 .telegram/
 exports/
+
+# Test fixtures are small, synthetic exports
+!tests/fixtures/**

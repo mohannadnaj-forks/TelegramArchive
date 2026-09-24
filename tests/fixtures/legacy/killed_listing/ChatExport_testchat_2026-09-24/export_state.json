@@ -1,0 +1,24 @@
+{
+  "listed": [
+    [
+      46,
+      90
+    ]
+  ],
+  "run": {
+    "status": "running",
+    "stage": "listing",
+    "pid": 65075,
+    "started": "2026-09-24T07:32:04",
+    "messages_in_chat": 90,
+    "listed_this_run": 45,
+    "updated": "2026-09-24T07:32:04",
+    "messages_exported": 45,
+    "files": {
+      "pending": {
+        "count": 21,
+        "bytes": 46440
+      }
+    }
+  }
+}

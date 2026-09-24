@@ -1,0 +1,18 @@
+{
+  "revision": "e7faf7f",
+  "runs": [
+    [
+      [],
+      {
+        "count": 90,
+        "kill_after_listed": 45
+      },
+      {
+        "CHECKPOINT_SECONDS": 0
+      }
+    ]
+  ],
+  "exit_codes": [
+    9
+  ]
+}

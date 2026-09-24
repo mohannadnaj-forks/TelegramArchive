@@ -1,0 +1,28 @@
+{
+  "listed": [
+    [
+      1,
+      90
+    ]
+  ],
+  "run": {
+    "status": "stopped",
+    "stage": "downloading",
+    "pid": 65062,
+    "started": "2026-09-24T07:32:03",
+    "messages_in_chat": 90,
+    "listed_this_run": 90,
+    "updated": "2026-09-24T07:32:03",
+    "messages_exported": 90,
+    "files": {
+      "downloaded": {
+        "count": 5,
+        "bytes": 9427
+      },
+      "pending": {
+        "count": 37,
+        "bytes": 82508
+      }
+    }
+  }
+}

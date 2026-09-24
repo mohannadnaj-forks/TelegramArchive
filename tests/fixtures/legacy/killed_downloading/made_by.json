@@ -1,0 +1,27 @@
+{
+  "revision": "e7faf7f",
+  "runs": [
+    [
+      [],
+      {
+        "count": 90,
+        "interrupt_after_listed": 30
+      },
+      {}
+    ],
+    [
+      [],
+      {
+        "count": 90,
+        "kill_after_downloads": 6
+      },
+      {
+        "CHECKPOINT_SECONDS": 0
+      }
+    ]
+  ],
+  "exit_codes": [
+    0,
+    9
+  ]
+}
