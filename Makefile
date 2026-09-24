@@ -42,7 +42,8 @@ help:  ## Show this help
 	@echo "  make build-manual    Build without Docker"
 	@echo ""
 	@echo "${YELLOW}Runtime:${NC}"
-	@echo "  make run               Run manually"
+	@echo "  make run CHATS=\"a b\" [OUT=dir]   Run manually"
+	@echo "  make viewer CHATS=\"a\" [OUT=dir]    Rebuild index.html from an existing export"
 	@echo "  make up                Start containers"
 	@echo "  make stop              Stop containers"
 	@echo "  make down              Stop and remove containers"
@@ -107,12 +108,17 @@ shell:  # Access container shell (specify service: make shell bot)
 	@$(COMPOSE_CMD) -f "$(COMPOSE_FILES)" exec $(SERVICE) /bin/bash
 
 
-.PHONY: build-manual run
+.PHONY: build-manual run viewer
 
 build-manual: env
 	python -m venv .venv
 	source ./.venv/bin/activate
 	pip install -r requirements.txt
 
+# make run CHATS="durov t.me/telegram" OUT=/Volumes/Drive/telegram ARGS="--since 2024-01-01 --max-total-size 50G"
 run:
-	python bot.py
+	.venv/bin/python bot.py $(CHATS) $(if $(OUT),--output "$(OUT)") $(ARGS)
+
+# make viewer CHATS="durov" OUT=/Volumes/Drive/telegram
+viewer:
+	.venv/bin/python bot.py --viewer-only $(CHATS) $(if $(OUT),--output "$(OUT)")

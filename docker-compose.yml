@@ -9,6 +9,8 @@ services:
       - .env
     environment:
       - DOWNLOAD_PATH=/app/data  # Force container path
+    command: python bot.py ${CHATS}
     volumes:
       - "${HOST_DOWNLOAD_PATH}:/app/data"
+      - "./.telegram:/app/.telegram"
     restart: unless-stopped

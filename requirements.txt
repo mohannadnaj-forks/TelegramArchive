@@ -1,4 +1,4 @@
-pyrogram
-tgcrypto
-python-dotenv
-tqdm-loggable
+Kurigram==2.2.26
+tgcrypto-pyrofork==1.2.8
+python-dotenv==1.2.3
+tqdm-loggable==0.4.1

@@ -144,3 +144,6 @@ todo
 *.ogg
 *.session-journal
 data/
+
+.telegram/
+exports/
