@@ -60,7 +60,7 @@ class ExportRun(unittest.TestCase):
     def run_bot(self, *args, checkpoint_seconds=10, env=None, chat=None, **scenario):
         open(self.log, 'w').close()
         scenario = {'count': 250, **scenario, 'log': self.log}
-        chats = [] if '--all' in args or chat == '' else [chat or self.chat]
+        chats = [] if '--all' in args or chat == '' else chat if isinstance(chat, list) else [chat or self.chat]
         settings = base_env(CHECKPOINT_SECONDS=checkpoint_seconds, **(env or {}))
         result = run_program(self.program, [*chats, '-o', self.out, *args], scenario, settings)
         self.output = result.stdout + result.stderr

@@ -3,7 +3,7 @@
 A scenario (a dict, so it can travel to a subprocess as JSON) describes the chat and the failures to
 inject. Every call the program makes is appended to scenario['log'] as one JSON line.
 
-Chats:
+Chats (scenario['messages']):
 - 'basic': messages 1..count, one hour apart from BASE_DATE; every third has a photo, every fifth a
   video, the rest are text. Exports in tests/fixtures were made with this chat, so it must not change.
 - 'rich': the first RICH_COUNT ids are one of each kind of message the exporter handles (see
@@ -104,8 +104,8 @@ def rich_message(i: int, chat_type: str = 'channel') -> SimpleNamespace:
     elif i == 2:
         # The emoji is two UTF-16 code units, so the bold entity starts at 3, not 2.
         m.text = text('😀 bold and a link, `code`', [
-            entity('BOLD', 3, 4), entity('TEXT_LINK', 18, 4, url='https://example.com'),
-            entity('PRE', 24, 6), entity('ITALIC', 3, 8)])
+            entity('BOLD', 3, 4), entity('TEXT_LINK', 14, 4, url='https://example.com'),
+            entity('PRE', 20, 6), entity('ITALIC', 3, 8)])
     elif i == 3:
         m.photo = SimpleNamespace(file_id=photo_file_id(i), file_size=1000 + i, width=1280, height=720, thumbs=None)
         m.caption = text('Photo #news', [entity('HASHTAG', 6, 5)])
@@ -169,7 +169,6 @@ def rich_message(i: int, chat_type: str = 'channel') -> SimpleNamespace:
         m.text = text('signed post')
     elif i == 25:
         m.photo = SimpleNamespace(file_id=photo_file_id(i), file_size=1000 + i, width=100, height=100, thumbs=None)
-        m.caption = text('')
     else:
         m.text = text(f'message {i}')
     return m
@@ -203,7 +202,7 @@ def install_fake_client(scenario: dict) -> type:
     gone_later = set(scenario.get('deleted_after_listing', []))
     ids = [i for i in range(1, scenario['count'] + 1) if i not in deleted]
     chat_type = scenario.get('chat_type', 'channel')
-    builder = rich_message if scenario.get('chat') == 'rich' else basic_message
+    builder = rich_message if scenario.get('messages') == 'rich' else basic_message
     counters = {'listed': 0, 'downloads': 0, 'attempts': {}, 'fetched': {}}
 
     def log(entry: dict) -> None:

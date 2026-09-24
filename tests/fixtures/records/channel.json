@@ -1,0 +1,397 @@
+{
+ "username": "testchat",
+ "name": "Test",
+ "type": "public_channel",
+ "id": "1234",
+ "messages": [
+  {
+   "id": 1,
+   "type": "message",
+   "date": "2024-01-01T01:00:00",
+   "from": "Test",
+   "from_id": "channel1234",
+   "views": 1,
+   "text": ""
+  },
+  {
+   "id": 2,
+   "type": "message",
+   "date": "2024-01-01T02:00:00",
+   "from": "Test",
+   "from_id": "channel1234",
+   "views": 1,
+   "text": [
+    {
+     "type": "bold",
+     "text": "bold",
+     "offset": 3,
+     "length": 4
+    },
+    {
+     "type": "text_link",
+     "href": "https://example.com",
+     "text": "link",
+     "offset": 14,
+     "length": 4
+    },
+    {
+     "type": "pre",
+     "language": "",
+     "text": "`code`",
+     "offset": 20,
+     "length": 6
+    },
+    {
+     "type": "italic",
+     "text": "bold and",
+     "offset": 3,
+     "length": 8
+    },
+    "😀 bold and a link, `code`"
+   ]
+  },
+  {
+   "id": 3,
+   "type": "message",
+   "date": "2024-01-01T03:00:00",
+   "from": "Test",
+   "from_id": "channel1234",
+   "views": 1,
+   "width": 1280,
+   "height": 720,
+   "photo": "photos/photo_3.jpg",
+   "file_status": {
+    "state": "downloaded",
+    "size": 1003
+   },
+   "caption": [
+    {
+     "type": "hashtag",
+     "text": "#news",
+     "offset": 6,
+     "length": 5
+    },
+    "Photo #news"
+   ],
+   "thumbnail": "photos/photo_3.jpg_thumb.jpg"
+  },
+  {
+   "id": 4,
+   "type": "message",
+   "date": "2024-01-01T04:00:00",
+   "from": "Test",
+   "from_id": "channel1234",
+   "media_group_id": "900",
+   "views": 1,
+   "width": 600,
+   "height": 800,
+   "photo": "photos/photo_4.jpg",
+   "file_status": {
+    "state": "downloaded",
+    "size": 1004
+   },
+   "caption": "An album",
+   "thumbnail": "photos/photo_4.jpg_thumb.jpg"
+  },
+  {
+   "id": 5,
+   "type": "message",
+   "date": "2024-01-01T05:00:00",
+   "from": "Test",
+   "from_id": "channel1234",
+   "media_group_id": "900",
+   "views": 1,
+   "width": 600,
+   "height": 800,
+   "photo": "photos/photo_5.jpg",
+   "file_status": {
+    "state": "downloaded",
+    "size": 1005
+   },
+   "text": "",
+   "thumbnail": "photos/photo_5.jpg_thumb.jpg"
+  },
+  {
+   "id": 6,
+   "type": "message",
+   "date": "2024-01-01T06:00:00",
+   "from": "Test",
+   "from_id": "channel1234",
+   "media_group_id": "900",
+   "views": 1,
+   "width": 600,
+   "height": 800,
+   "photo": "photos/photo_6.jpg",
+   "file_status": {
+    "state": "downloaded",
+    "size": 1006
+   },
+   "text": "",
+   "thumbnail": "photos/photo_6.jpg_thumb.jpg"
+  },
+  {
+   "id": 7,
+   "type": "message",
+   "date": "2024-01-01T07:00:00",
+   "from": "Test",
+   "from_id": "channel1234",
+   "views": 1,
+   "media_type": "video_file",
+   "mime_type": "video/mp4",
+   "duration_seconds": 12.5,
+   "width": 1920,
+   "height": 1080,
+   "file": "video_files/7_Clip _1_.MP4",
+   "file_status": {
+    "state": "downloaded",
+    "size": 5007
+   },
+   "thumbnail": "video_files/7_Clip _1_.MP4_thumb.jpg",
+   "caption": "A named video"
+  },
+  {
+   "id": 8,
+   "type": "message",
+   "date": "2024-01-01T08:00:00",
+   "from": "Test",
+   "from_id": "channel1234",
+   "views": 1,
+   "media_type": "video_file",
+   "mime_type": "video/mp4",
+   "duration_seconds": 3,
+   "width": 640,
+   "height": 360,
+   "file": "video_files/video_8.mp4",
+   "file_status": {
+    "state": "downloaded",
+    "size": 5008
+   },
+   "thumbnail": "video_files/video_8.mp4",
+   "text": ""
+  },
+  {
+   "id": 9,
+   "type": "message",
+   "date": "2024-01-01T09:00:00",
+   "from": "Test",
+   "from_id": "channel1234",
+   "views": 1,
+   "mime_type": "application/pdf",
+   "file": "files/9_report.pdf",
+   "file_status": {
+    "state": "downloaded",
+    "size": 3009
+   },
+   "thumbnail": "files/9_report.pdf",
+   "text": ""
+  },
+  {
+   "id": 10,
+   "type": "message",
+   "date": "2024-01-01T10:00:00",
+   "from": "Test",
+   "from_id": "channel1234",
+   "views": 1,
+   "mime_type": "application/zip",
+   "file": "files/document_10.zip",
+   "file_status": {
+    "state": "downloaded",
+    "size": 3010
+   },
+   "thumbnail": "files/document_10.zip",
+   "text": ""
+  },
+  {
+   "id": 11,
+   "type": "message",
+   "date": "2024-01-01T11:00:00",
+   "from": "Test",
+   "from_id": "channel1234",
+   "views": 1,
+   "media_type": "audio_file",
+   "mime_type": "audio/mpeg",
+   "duration_seconds": 200,
+   "performer": "Artist",
+   "title": "Song",
+   "file": "files/11_song.mp3",
+   "file_status": {
+    "state": "downloaded",
+    "size": 4011
+   },
+   "thumbnail": "files/11_song.mp3",
+   "text": ""
+  },
+  {
+   "id": 12,
+   "type": "message",
+   "date": "2024-01-01T12:00:00",
+   "from": "Test",
+   "from_id": "channel1234",
+   "views": 1,
+   "media_type": "voice_message",
+   "mime_type": "audio/ogg",
+   "duration_seconds": 4,
+   "file": "voice_messages/voice_12.oga",
+   "file_status": {
+    "state": "downloaded",
+    "size": 712
+   },
+   "text": ""
+  },
+  {
+   "id": 13,
+   "type": "message",
+   "date": "2024-01-01T13:00:00",
+   "from": "Test",
+   "from_id": "channel1234",
+   "views": 1,
+   "media_type": "sticker",
+   "mime_type": "image/webp",
+   "width": 512,
+   "height": 512,
+   "sticker_emoji": "👍",
+   "file": "stickers/sticker_13.webp",
+   "file_status": {
+    "state": "downloaded",
+    "size": 313
+   },
+   "thumbnail": "stickers/sticker_13.webp_thumb.jpg",
+   "text": ""
+  },
+  {
+   "id": 14,
+   "type": "message",
+   "date": "2024-01-01T14:00:00",
+   "from": "Test",
+   "from_id": "channel1234",
+   "views": 1,
+   "media_type": "animation",
+   "mime_type": "video/mp4",
+   "duration_seconds": 2,
+   "width": 320,
+   "height": 240,
+   "file": "video_files/animation_14.mp4",
+   "file_status": {
+    "state": "downloaded",
+    "size": 2014
+   },
+   "thumbnail": "video_files/animation_14.mp4",
+   "text": ""
+  },
+  {
+   "id": 15,
+   "type": "message",
+   "date": "2024-01-01T15:00:00",
+   "from": "Test",
+   "from_id": "channel1234",
+   "views": 1,
+   "media_type": "video_message",
+   "mime_type": "video/mp4",
+   "duration_seconds": 9,
+   "file": "round_video_messages/video_note_15.mp4",
+   "file_status": {
+    "state": "downloaded",
+    "size": 1515
+   },
+   "thumbnail": "round_video_messages/video_note_15.mp4_thumb.jpg",
+   "text": ""
+  },
+  {
+   "id": 16,
+   "type": "message",
+   "date": "2024-01-01T16:00:00",
+   "from": "Test",
+   "from_id": "channel1234",
+   "views": 1,
+   "contact_information": {
+    "phone_number": "+10000000000",
+    "fist_name": "Ada",
+    "last_name": ""
+   },
+   "contact_vcard": "contacts/contact_16.vcf",
+   "text": ""
+  },
+  {
+   "id": 17,
+   "type": "message",
+   "date": "2024-01-01T17:00:00",
+   "from": "Test",
+   "from_id": "channel1234",
+   "views": 1,
+   "location_information": {
+    "latitude": 51.5,
+    "longitude": -0.12
+   },
+   "text": ""
+  },
+  {
+   "id": 18,
+   "type": "message",
+   "date": "2024-01-01T18:00:00",
+   "from": "Test",
+   "from_id": "channel1234",
+   "views": 1,
+   "forwarded_from": "Other Channel",
+   "text": "forwarded from a channel"
+  },
+  {
+   "id": 19,
+   "type": "message",
+   "date": "2024-01-01T19:00:00",
+   "from": "Test",
+   "from_id": "channel1234",
+   "views": 1,
+   "forwarded_from": "Nikolai",
+   "text": "forwarded from a person"
+  },
+  {
+   "id": 20,
+   "type": "message",
+   "date": "2024-01-01T20:00:00",
+   "from": "Test",
+   "from_id": "channel1234",
+   "reply_to_message_id": 2,
+   "views": 1,
+   "text": "a reply"
+  },
+  {
+   "id": 21,
+   "type": "message",
+   "date": "2024-01-01T21:00:00",
+   "from": "Test",
+   "from_id": "channel1234",
+   "views": 1,
+   "media_type": "video_file",
+   "mime_type": "video/mp4",
+   "duration_seconds": 600,
+   "width": 1920,
+   "height": 1080,
+   "file": "(File exceeds maximum size. Change data exporting settings to download.)",
+   "file_status": {
+    "state": "too_large",
+    "size": 524288000,
+    "limit": 209715200
+   },
+   "thumbnail": "(File exceeds maximum size. Change data exporting settings to download.)",
+   "text": ""
+  },
+  {
+   "id": 22,
+   "type": "message",
+   "date": "2024-01-01T22:00:00",
+   "from": "Test",
+   "from_id": "channel1234",
+   "views": 1,
+   "text": "message 22"
+  },
+  {
+   "id": 23,
+   "type": "message",
+   "date": "2024-01-01T23:00:00",
+   "from": "Test",
+   "from_id": "channel1234",
+   "views": 1,
+   "text": "message 23"
+  }
+ ]
+}
