@@ -16,7 +16,7 @@ import unittest
 from datetime import datetime, timedelta
 from types import SimpleNamespace
 
-HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PROGRAM_FILES = ('bot.py', 'configs.py', 'chats.py', '_index.html')
 BASE_DATE = datetime(2024, 1, 1)
 PAGE = 100
@@ -122,7 +122,7 @@ class ExportRun(unittest.TestCase):
         self.program = os.path.join(self.dir, 'program')
         os.makedirs(self.program)
         for name in PROGRAM_FILES:
-            shutil.copy(os.path.join(HERE, name), self.program)
+            shutil.copy(os.path.join(ROOT, name), self.program)
         self.out = os.path.join(self.dir, 'out')
         self.log = os.path.join(self.dir, 'calls.jsonl')
 

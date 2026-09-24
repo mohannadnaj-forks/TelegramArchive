@@ -24,7 +24,7 @@ ChatExport_<chat>_<YYYY-MM-DD>/
 the day the export was first started; later runs continue the same directory.
 
 File names are built from the message id (see `media_file_name` in `bot.py`, pinned by
-`test_naming.py`): `<kind>_<message id><ext>` when the file has no name of its own, or
+`tests/test_naming.py`): `<kind>_<message id><ext>` when the file has no name of its own, or
 `<message id>_<original name, sanitised>` when it has one. Names use only characters valid
 on exFAT, NTFS and Windows. The name is the same on every run, which is what resume relies on.
 

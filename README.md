@@ -107,7 +107,7 @@ Set `CHATS` and `HOST_DOWNLOAD_PATH` in `.env`, then `make build-up`. Log in onc
 
 ## Tests
 ```shell
-.venv/bin/python -m unittest test_naming test_export
+.venv/bin/python -m unittest
 ```
 
 ## Contribute
