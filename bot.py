@@ -309,7 +309,7 @@ class Archive:
 
         if chat.type == ChatType.CHANNEL:
             msg_info['from'] = chat.title
-            msg_info['from_id'] = f'channel{str(message.sender_chat.id).removeprefix("-100")}'
+            msg_info['from_id'] = f'channel{str(chat.id).removeprefix("-100")}'
         elif message.from_user is not None:
             msg_info['from'] = ' '.join(filter(None, (message.from_user.first_name, message.from_user.last_name)))
             msg_info['from_id'] = f'user{message.from_user.id}'

@@ -43,17 +43,21 @@ class RichChat(ExportRun):
 
 class ChannelRecords(RichChat):
     def test_records_match_the_golden_file(self):
-        self.export('channel', count=23)
+        self.export('channel')
         self.assert_golden('channel')
 
     def test_chat_fields(self):
-        self.export('channel', count=23, description='About this channel')
+        self.export('channel', description='About this channel')
         chat = {k: v for k, v in self.result().items() if k != 'messages'}
         self.assertEqual(chat, {'username': 'testchat', 'description': 'About this channel', 'name': 'Test',
                                 'type': 'public_channel', 'id': '1234'})
 
+    def test_a_post_signed_with_its_authors_profile_is_from_the_channel(self):
+        record = self.export('channel')[24]
+        self.assertEqual((record['from'], record['from_id'], record['text']), ('Test', 'channel1234', 'signed post'))
+
     def test_entities_keep_telegram_offsets_in_utf16_units(self):
-        text = self.export('channel', count=23)[2]['text']
+        text = self.export('channel')[2]['text']
         self.assertEqual(text[-1], '😀 bold and a link, `code`')
         self.assertEqual(text[0], {'type': 'bold', 'text': 'bold', 'offset': 3, 'length': 4})
         self.assertEqual(text[1], {'type': 'text_link', 'href': 'https://example.com', 'text': 'link', 'offset': 14, 'length': 4})
@@ -61,7 +65,7 @@ class ChannelRecords(RichChat):
         self.assertEqual(text[3]['text'], 'bold and', 'entities overlap and keep Telegram order')
 
     def test_media_names_and_thumbnails(self):
-        records = self.export('channel', count=23)
+        records = self.export('channel')
         self.assertEqual(records[3]['photo'], 'photos/photo_3.jpg')
         self.assertEqual(records[3]['thumbnail'], 'photos/photo_3.jpg_thumb.jpg')
         self.assertEqual(records[7]['file'], 'video_files/7_Clip _1_.MP4')
@@ -78,25 +82,25 @@ class ChannelRecords(RichChat):
                 self.assertTrue(os.path.exists(self.path(path)), path)
 
     def test_albums_carry_their_group_id_and_the_caption_stays_on_its_message(self):
-        records = self.export('channel', count=23)
+        records = self.export('channel')
         self.assertEqual([records[i].get('media_group_id') for i in (3, 4, 5, 6)], [None, '900', '900', '900'])
         self.assertEqual(records[4]['caption'], 'An album')
         self.assertEqual(records[5]['text'], '')
 
     def test_a_file_over_the_size_limit_is_recorded_with_its_size(self):
-        record = self.export('channel', count=23)[21]
+        record = self.export('channel')[21]
         self.assertEqual(record['file_status'], {'state': 'too_large', 'size': 500 * 1024 * 1024, 'limit': 200 * 1024 * 1024})
         self.assertEqual(record['file'], '(File exceeds maximum size. Change data exporting settings to download.)')
 
     def test_switched_off_kinds_are_recorded_as_disabled(self):
-        records = self.export('channel', count=23, env={'MEDIA_EXPORT_DOCUMENTS': 'False', 'MEDIA_EXPORT_CONTACTS': 'False'})
+        records = self.export('channel', env={'MEDIA_EXPORT_DOCUMENTS': 'False', 'MEDIA_EXPORT_CONTACTS': 'False'})
         self.assertEqual(records[9]['file_status'], {'state': 'disabled', 'setting': 'MEDIA_EXPORT_DOCUMENTS'})
         self.assertEqual(records[9]['file'], '(File not included. Change data exporting settings to download.)')
         self.assertEqual(records[16]['contact_vcard'], '(File not included. Change data exporting settings to download.)')
         self.assertNotIn('9_report.pdf', self.downloaded_files())
 
     def test_contacts_are_written_as_vcards(self):
-        records = self.export('channel', count=23)
+        records = self.export('channel')
         self.assertEqual(records[16]['contact_information'], {'phone_number': '+10000000000', 'fist_name': 'Ada', 'last_name': ''})
         self.assertEqual(records[16]['contact_vcard'], 'contacts/contact_16.vcf')
         with open(self.path('contacts', 'contact_16.vcf'), encoding='utf-8') as f:
