@@ -30,11 +30,6 @@ from chats import ChatExporter
 
 logger = logging.getLogger(__name__)
 
-for stream in (sys.stdout, sys.stderr):
-    stream.reconfigure(encoding='utf-8', errors='replace')
-
-# Global checkpoint data for resuming
-
 class LowDiskSpace(Exception):
     pass
 
@@ -268,8 +263,6 @@ def signal_handler(signum, frame):
         raise KeyboardInterrupt
     shutdown_requested = True
     print("\n🛑 Stopping after the current message. Press Ctrl-C again to exit immediately.")
-
-signal.signal(signal.SIGINT, signal_handler)
 
 
 class Archive:
@@ -763,7 +756,7 @@ def split_json_file(data: dict, output_path: str, page_size: int = JSON_FILE_PAG
         number += 1
 
 
-async def main():
+async def export_chats():
     fmt = "%(asctime)s - %(message)s"
     logging.basicConfig(level=logging.INFO, format=fmt, datefmt='%Y-%m-%d %H:%M:%S')
 
@@ -1077,35 +1070,19 @@ def parse_chat(value: str):
     return int(value) if re.fullmatch(r'-?\d+', value) else value
 
 
-parser = argparse.ArgumentParser(description="Export Telegram chats to JSON, media files and an HTML viewer.")
-parser.add_argument('chats', nargs='*', help="usernames, t.me links or numeric ids; 'me' is Saved Messages")
-parser.add_argument('--all', action='store_true', help="export every chat allowed by the CHAT_EXPORT_* settings")
-parser.add_argument('-o', '--output', default=DOWNLOAD_PATH or 'exports', help="directory to export into (default: DOWNLOAD_PATH from .env, else ./exports)")
-parser.add_argument('--since', type=parse_date, metavar='YYYY-MM-DD', help="only messages from this day on")
-parser.add_argument('--until', type=parse_date, metavar='YYYY-MM-DD', help="only messages up to and including this day")
-parser.add_argument('--max-file-size', type=parse_size, default='200M', metavar='SIZE', help="leave out files larger than this, e.g. 50M, 1G; 0 for no limit (default: 200M)")
-parser.add_argument('--max-total-size', type=parse_size, default='10G', metavar='SIZE', help="stop, with progress saved, before a chat's media passes this; 0 for no limit (default: 10G)")
-parser.add_argument('--refresh', action='store_true', help="re-read the whole history, refreshing edited messages, instead of only messages newer than the export")
-parser.add_argument('--viewer-only', action='store_true', help="rebuild index.html and data.js from the existing result.json, without connecting to Telegram; chats may also be export directories")
-args = parser.parse_args()
-if args.since and args.until and args.since > args.until:
-    parser.error("--since is after --until")
-if not args.chats and not args.all:
-    parser.error("name at least one chat, or pass --all")
-if args.viewer_only and args.all:
-    parser.error("--viewer-only needs the chats or export directories to rebuild")
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Export Telegram chats to JSON, media files and an HTML viewer.")
+    parser.add_argument('chats', nargs='*', help="usernames, t.me links or numeric ids; 'me' is Saved Messages")
+    parser.add_argument('--all', action='store_true', help="export every chat allowed by the CHAT_EXPORT_* settings")
+    parser.add_argument('-o', '--output', default=DOWNLOAD_PATH or 'exports', help="directory to export into (default: DOWNLOAD_PATH from .env, else ./exports)")
+    parser.add_argument('--since', type=parse_date, metavar='YYYY-MM-DD', help="only messages from this day on")
+    parser.add_argument('--until', type=parse_date, metavar='YYYY-MM-DD', help="only messages up to and including this day")
+    parser.add_argument('--max-file-size', type=parse_size, default='200M', metavar='SIZE', help="leave out files larger than this, e.g. 50M, 1G; 0 for no limit (default: 200M)")
+    parser.add_argument('--max-total-size', type=parse_size, default='10G', metavar='SIZE', help="stop, with progress saved, before a chat's media passes this; 0 for no limit (default: 10G)")
+    parser.add_argument('--refresh', action='store_true', help="re-read the whole history, refreshing edited messages, instead of only messages newer than the export")
+    parser.add_argument('--viewer-only', action='store_true', help="rebuild index.html and data.js from the existing result.json, without connecting to Telegram; chats may also be export directories")
+    return parser
 
-CHAT_IDS = [parse_chat(c) for c in args.chats]
-EXPORT_ALL = args.all
-SINCE = args.since
-UNTIL = args.until + timedelta(days=1) if args.until else None
-MAX_FILE_SIZE = args.max_file_size
-MAX_TOTAL_SIZE = args.max_total_size
-REFRESH = args.refresh
-DOWNLOAD_PATH = os.path.abspath(os.path.expanduser(args.output))
-
-SESSION_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.telegram')
-os.makedirs(SESSION_DIR, exist_ok=True)
 
 def rebuild_viewers(chats: list) -> None:
     for chat in chats:
@@ -1122,10 +1099,6 @@ def rebuild_viewers(chats: list) -> None:
         generate_index_html(export_directory, chat_data)
         print(f"✅ Rebuilt viewer for {chat_data.get('name', username)}: {len(chat_data['messages']):,} messages -> {export_directory}/index.html")
 
-
-if args.viewer_only:
-    rebuild_viewers(args.chats)
-    sys.exit(0)
 
 def lock_session() -> None:
     # Two clients on one session can lock its database or get the login revoked (AUTH_KEY_DUPLICATED).
@@ -1144,18 +1117,51 @@ def lock_session() -> None:
                  "Wait for it to finish, or name several chats in one command.")
 
 
-lock_session()
-os.makedirs(DOWNLOAD_PATH, exist_ok=True)
+def main(argv=None) -> None:
+    global CHAT_IDS, EXPORT_ALL, SINCE, UNTIL, MAX_FILE_SIZE, MAX_TOTAL_SIZE, REFRESH, DOWNLOAD_PATH, SESSION_DIR, app
+    for stream in (sys.stdout, sys.stderr):
+        stream.reconfigure(encoding='utf-8', errors='replace')
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    if args.since and args.until and args.since > args.until:
+        parser.error("--since is after --until")
+    if not args.chats and not args.all:
+        parser.error("name at least one chat, or pass --all")
+    if args.viewer_only and args.all:
+        parser.error("--viewer-only needs the chats or export directories to rebuild")
 
-app = Client(
-    "my_bot",
-    api_id=API_ID,
-    api_hash=API_HASH,
-    workdir=SESSION_DIR,
-)
+    CHAT_IDS = [parse_chat(c) for c in args.chats]
+    EXPORT_ALL = args.all
+    SINCE = args.since
+    UNTIL = args.until + timedelta(days=1) if args.until else None
+    MAX_FILE_SIZE = args.max_file_size
+    MAX_TOTAL_SIZE = args.max_total_size
+    REFRESH = args.refresh
+    DOWNLOAD_PATH = os.path.abspath(os.path.expanduser(args.output))
 
-try:
-    asyncio.run(main())
-except KeyboardInterrupt:
-    print("\n👋 Interrupted.")
+    SESSION_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.telegram')
+    os.makedirs(SESSION_DIR, exist_ok=True)
 
+    if args.viewer_only:
+        rebuild_viewers(args.chats)
+        sys.exit(0)
+
+    signal.signal(signal.SIGINT, signal_handler)
+    lock_session()
+    os.makedirs(DOWNLOAD_PATH, exist_ok=True)
+
+    app = Client(
+        "my_bot",
+        api_id=API_ID,
+        api_hash=API_HASH,
+        workdir=SESSION_DIR,
+    )
+
+    try:
+        asyncio.run(export_chats())
+    except KeyboardInterrupt:
+        print("\n👋 Interrupted.")
+
+
+if __name__ == '__main__':
+    main()
