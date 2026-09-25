@@ -29,7 +29,6 @@ class Settings:
     suspected_flood_wait_duration: int = 300
     checkpoint_seconds: int = 10
     resume_enabled: bool = True
-    atomic_writes: bool = True
     min_free_disk_mb: int = 2048
 
     @classmethod
@@ -46,6 +45,5 @@ class Settings:
             suspected_flood_wait_duration=int(env.get('SUSPECTED_FLOOD_WAIT_DURATION', '300')),
             checkpoint_seconds=int(env.get('CHECKPOINT_SECONDS', '10')),
             resume_enabled=str_to_bool(env.get('RESUME_ENABLED', 'True')),
-            atomic_writes=str_to_bool(env.get('ATOMIC_WRITES', 'True')),
             min_free_disk_mb=int(env.get('MIN_FREE_DISK_MB', '2048')),
         )

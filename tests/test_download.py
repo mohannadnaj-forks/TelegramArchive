@@ -60,8 +60,8 @@ class Downloads(unittest.TestCase):
         self.assertEqual(self.fetch(['ok']), (True, None))
         self.assertEqual(os.listdir(self.dir), ['video_1.mp4'])
 
-    def test_without_atomic_writes_the_file_is_written_in_place(self):
-        self.assertEqual(self.fetch([ConnectionError('gone')] * 5, atomic_writes=False), (False, 'gone'))
+    def test_a_failed_download_leaves_nothing_behind(self):
+        self.assertEqual(self.fetch([ConnectionError('gone')] * 5), (False, 'gone'))
         self.assertEqual(os.listdir(self.dir), [])
 
     def test_flood_waits_are_waited_out(self):

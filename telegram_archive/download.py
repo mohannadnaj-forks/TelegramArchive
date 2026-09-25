@@ -38,7 +38,7 @@ class Downloader:
         if free_mb < settings.min_free_disk_mb:
             raise LowDiskSpace(f"{free_mb:,} MB free at {os.path.dirname(destination)}, below MIN_FREE_DISK_MB={settings.min_free_disk_mb:,}")
 
-        temp_destination = f"{destination}.tmp" if settings.atomic_writes else destination
+        temp_destination = f"{destination}.tmp"
         zero_bytes_attempts = 0
         last_error = 'zero bytes written'
         max_zero_bytes_attempts = settings.zero_bytes_max_retries
@@ -56,8 +56,7 @@ class Downloader:
                     pyrogram_logger.setLevel(original_level)
 
                 if os.path.exists(temp_destination) and os.path.getsize(temp_destination) > 0:
-                    if settings.atomic_writes:
-                        os.replace(temp_destination, destination)
+                    os.replace(temp_destination, destination)
                     file_size = os.path.getsize(destination)
                     logger.info(f"✅ Downloaded: {os.path.basename(destination)} ({file_size:,} bytes)")
                     pbar.set_postfix(status="Downloaded ✅")
