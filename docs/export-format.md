@@ -159,7 +159,7 @@ interface Run {
   pid: number;
   started: Instant;
   updated?: Instant;    // written at every checkpoint
-  options: { since: string | null; until: string | null; max_file_size: number; max_total_size: number; refresh: boolean };
+  options?: { since: string | null; until: string | null; max_file_size: number; max_total_size: number; refresh: boolean };
   listed?: number;      // items listed by this run
   items_at_source?: number | null;  // Telegram's count of messages at the start of the run
   error?: string;       // status "failed"
