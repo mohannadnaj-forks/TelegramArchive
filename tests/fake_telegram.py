@@ -213,8 +213,9 @@ def make_fake_client(scenario: dict, kill=lambda: os._exit(9)) -> type:
         message = builder(i, chat_type)
         if fetch:
             counters['fetched'][i] = counters['fetched'].get(i, 0) + 1
-        # The first fetch by id of these messages carries a file reference that has already expired.
-        if fetch and counters['fetched'][i] == 1 and i in scenario.get('expired_references', []):
+        # The first fetch by id of these messages (every fetch, for always_expired) carries an expired file reference.
+        if fetch and (counters['fetched'][i] == 1 and i in scenario.get('expired_references', [])
+                      or i in scenario.get('always_expired', [])):
             for attr in MEDIA_ATTRS:
                 media = getattr(message, attr)
                 if media is not None and ':' in media.file_id:

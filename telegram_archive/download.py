@@ -4,7 +4,7 @@ import logging
 import os
 import shutil
 
-from pyrogram.errors import FloodWait
+from pyrogram.errors import FileReferenceExpired, FloodWait
 
 from .settings import Settings
 
@@ -27,7 +27,9 @@ class Downloader:
         self.free_bytes = free_bytes
 
     async def fetch(self, file_id: str, destination: str, pbar) -> tuple[bool, str | None]:
-        """Downloads file_id to destination unless it is there. Returns (ok, the last error)."""
+        """Downloads file_id to destination unless it is there. Returns (ok, the last error).
+
+        FileReferenceExpired is raised at once: retrying the same reference cannot succeed."""
         if os.path.exists(destination):
             return True, None
 
@@ -75,6 +77,11 @@ class Downloader:
                     await self.sleep(estimated_wait)
                     zero_bytes_attempts = 0
                     continue
+
+            except FileReferenceExpired:
+                if os.path.exists(temp_destination):
+                    os.remove(temp_destination)
+                raise
 
             except FloodWait as e:
                 last_error = str(e)

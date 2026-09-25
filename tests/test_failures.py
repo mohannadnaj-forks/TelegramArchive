@@ -54,8 +54,15 @@ class DownloadRetries(ExportRun):
         self.assertFalse(os.path.exists(self.path('video_files', VIDEO)))
         self.assertFalse(os.path.exists(self.path('video_files', VIDEO + '.tmp')))
 
-    def test_an_expired_file_reference_fails_the_file_until_the_next_run(self):
+    def test_an_expired_file_reference_is_renewed_by_fetching_the_message_again(self):
         self.assertEqual(self.run_bot(expired_references=[250]), 0, self.output)
+        self.assertEqual(self.status_of(250)['state'], 'downloaded')
+        self.assertIn({'call': 'get_messages', 'ids': [250]}, self.calls('get_messages'))
+        self.assertEqual([c['attempt'] for c in self.calls('download') if c['path'] == VIDEO], [1, 2])
+        self.assertEqual(self.sleeps(), [])
+
+    def test_a_reference_that_expires_again_fails_the_file_until_the_next_run(self):
+        self.assertEqual(self.run_bot(always_expired=[250]), 0, self.output)
         status = self.status_of(250)
         self.assertEqual(status['state'], 'failed')
         self.assertIn('FILE_REFERENCE_EXPIRED', status['error'])

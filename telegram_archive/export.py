@@ -1,11 +1,12 @@
 """Exporting one chat: listing its messages, then downloading their files."""
+import contextlib
 import logging
 import os
 import time
 from dataclasses import dataclass
 from datetime import datetime
 
-from pyrogram.errors import FloodWait
+from pyrogram.errors import FileReferenceExpired, FloodWait
 from tqdm_loggable.auto import tqdm
 
 from . import file_status, records
@@ -271,7 +272,7 @@ class ChatExport:
         elif status is None:
             os.makedirs(os.path.dirname(path), exist_ok=True)
             pbar.set_postfix(file=name)
-            ok, error = await self.downloader.fetch(media.file_id, path, pbar)
+            ok, error = await self.fetch(message, media, path, pbar)
             pbar.set_postfix(file=None)
             status = file_status.downloaded(os.path.getsize(path)) if ok else file_status.failed(error)
             if ok:
@@ -282,13 +283,29 @@ class ChatExport:
         if thumb_path is not None:
             if downloaded and not os.path.exists(thumb_path):
                 thumb_id = thumbs[0].file_id if kind.path_key == 'file' else photo_size_id(media.file_id, 'm')
-                await self.downloader.fetch(thumb_id, thumb_path, pbar)
+                with contextlib.suppress(FileReferenceExpired):
+                    await self.downloader.fetch(thumb_id, thumb_path, pbar)
             if os.path.exists(thumb_path):
                 record['thumbnail'] = f'{relative}_thumb.jpg'
             elif kind.path_key == 'file':
                 record['thumbnail'] = record['file']
         elif kind.path_key == 'file' and kind.media_type != 'voice_message':
             record['thumbnail'] = record['file']
+
+    async def fetch(self, message, media, path: str, pbar) -> tuple[bool, str | None]:
+        """Downloads the file; when its reference has expired, fetches the message again, once."""
+        try:
+            return await self.downloader.fetch(media.file_id, path, pbar)
+        except FileReferenceExpired as e:
+            error = str(e)
+        [fresh] = await self.get_messages([message.id])
+        found = find_media(fresh) if fresh is not None and not fresh.empty else None
+        if not found:
+            return False, error
+        try:
+            return await self.downloader.fetch(found[1].file_id, path, pbar)
+        except FileReferenceExpired as e:
+            return False, str(e)
 
     def wanted(self, record: dict) -> bool:
         return file_status.is_wanted(record, self.settings.media, self.options.max_file_size,

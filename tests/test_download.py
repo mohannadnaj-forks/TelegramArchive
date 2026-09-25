@@ -5,7 +5,7 @@ import shutil
 import tempfile
 import unittest
 
-from pyrogram.errors import FloodWait
+from pyrogram.errors import FileReferenceExpired, FloodWait
 
 from telegram_archive.download import Downloader, LowDiskSpace
 from telegram_archive.settings import Settings
@@ -81,6 +81,11 @@ class Downloads(unittest.TestCase):
         self.assertEqual(self.fetch(['zero'] * 5), (False, 'zero bytes written'))
         self.assertEqual(self.waits, [2, 120, 8, 120])
         self.assertEqual(os.listdir(self.dir), [])
+
+    def test_an_expired_file_reference_is_not_retried(self):
+        with self.assertRaises(FileReferenceExpired):
+            self.fetch([FileReferenceExpired(), 'ok'])
+        self.assertEqual((self.client.attempts, self.waits, os.listdir(self.dir)), (1, [], []))
 
     def test_low_disk_space_stops_before_downloading(self):
         with self.assertRaises(LowDiskSpace):
