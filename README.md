@@ -58,18 +58,18 @@ or directly:
 | Option | Default | |
 |---|---|---|
 | `--since`, `--until` `YYYY-MM-DD` | whole history | Only messages in this range, both days included. Ranges exported at different times merge into the same export. |
-| `--max-file-size SIZE` | `200M` | Files larger than this are left out and marked as such in the JSON. |
+| `--max-file-size SIZE` | `200M` | Files larger than this are left out and marked as such in the archive. |
 | `--max-total-size SIZE` | `10G` | Files that would take a chat's media past this are left out, starting from the oldest; the rest of the export completes. Run again with a larger value to fetch them. |
 | `--refresh` | off | Re-read the whole history. Without it, a run lists only messages it has not listed before, so edits to older messages are not picked up. |
 
 Sizes take `K`, `M`, `G` suffixes; `0` means no limit. With make, pass these through `ARGS="..."`.
 
-To change the viewer without re-running an export, rebuild it from the existing `result.json`:
+To change the viewer without re-running an export, rebuild it from the existing `archive.db`:
 ```shell
 .venv/bin/python bot.py --viewer-only durov --output /path/to/exports
 make viewer CHATS="durov" OUT=/path/to/exports
 ```
-It also accepts an export directory in place of a chat name and does not connect to Telegram.
+It also accepts an archive folder in place of a chat name and does not connect to Telegram.
 Chats are usernames, `t.me` links or numeric ids. Without `--output` the export goes to
 `DOWNLOAD_PATH` from `.env`, or `./exports`.
 
@@ -78,15 +78,17 @@ two-step password if you have one. The resulting session is stored in `.telegram
 (git-ignored); anyone holding that file can act as your account.
 Only one run can use the session at a time; to export several chats, name them all in one command.
 
-Each chat is exported to `ChatExport_<chat>_<date>/` with `result.json`, the media folders
-and an `index.html` viewer. The viewer opens straight from disk, no server needed; it reads
+Each chat is archived to `telegram-<username>/` with `archive.db` (a SQLite file holding the
+messages, the state of every file and every run; [docs/export-format.md](docs/export-format.md)
+describes it), the files under `media/<month>/`, and an `index.html` viewer. The viewer opens straight from disk, no server needed; it reads
 the messages from `data/` (one file per month, plus an index and a search file) and loads
 only the months near what is on screen. Every run keeps the messages already exported, reads what is new
 (the whole chat on the first run or with `--refresh`), and downloads whatever the current
 settings want that is not on disk yet — so
 raising a limit, switching a media type on, or a failed download is fixed by running again.
-Each message's `file_status` in the JSON says whether its file was downloaded and, if not,
-why (`disabled`, `too_large`, `total_limit`, `failed`).
+The archive records for each file whether it was downloaded and, if not, why (`disabled`,
+`too_large`, `total_limit`, `failed`, or `unavailable` for a message deleted before its file
+was fetched).
 A run first lists the messages, newest first, then downloads their files, newest first.
 Ctrl-C stops after the current message and saves progress, in either pass; the next run
 continues where it stopped, without listing again what was already listed. The run also
