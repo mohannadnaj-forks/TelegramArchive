@@ -6,6 +6,7 @@ fifth a video. test_end_to_end.py repeats the Ctrl-C and kill cases in a real su
 import os
 import unittest
 
+from telegram_archive.store import Archive
 from tests.support import ExportRun, message_id_of
 
 
@@ -148,6 +149,29 @@ class Refresh(ExportRun):
         self.assertEqual(self.run_bot('--refresh', count=150), 0, self.output)
         self.assertEqual(self.listed_ids(), list(range(150, 0, -1)))
         self.assertEqual(self.calls('download'), [])
+
+    def test_stored_paths_are_kept_when_items_are_listed_again(self):
+        self.run_bot(count=10, chat_photo=True)
+        archive = Archive(self.path())
+        try:
+            item = archive.item('9')
+            for key, new in (('path', 'photos/photo_9.jpg'), ('thumbnail', 'photos/photo_9.jpg_thumb.jpg')):
+                os.makedirs(self.path('photos'), exist_ok=True)
+                os.replace(self.path(*item['media'][0][key].split('/')), self.path(*new.split('/')))
+                item['media'][0][key] = new
+            archive.put_item(item, 9)
+            account = archive.get('account')
+            os.replace(self.path('account', 'photo.jpg'), self.path('chat_photo.jpg'))
+            archive.set('account', {**account, 'photo': 'chat_photo.jpg'})
+            archive.commit()
+        finally:
+            archive.close()
+        self.assertEqual(self.run_bot('--refresh', count=10, chat_photo=True), 0, self.output)
+        self.assertEqual(self.calls('download'), [])
+        medium = self.medium(9)
+        self.assertEqual((medium['state'], medium['path'], medium['thumbnail']),
+                         ('downloaded', 'photos/photo_9.jpg', 'photos/photo_9.jpg_thumb.jpg'))
+        self.assertEqual(self.archive()['account']['photo'], 'chat_photo.jpg')
 
 
 if __name__ == '__main__':

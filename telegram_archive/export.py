@@ -155,7 +155,8 @@ class ChatExport:
         return complete
 
     async def save_account_photo(self) -> None:
-        path = self.full_path(ACCOUNT_PHOTO)
+        photo = self.account.get('photo') or ACCOUNT_PHOTO
+        path = self.full_path(photo)
         if not os.path.exists(path) and getattr(self.chat, 'photo', None):
             os.makedirs(os.path.dirname(path), exist_ok=True)
             try:
@@ -163,7 +164,7 @@ class ChatExport:
             except Exception as e:
                 logger.warning(f"⚠️ Could not download the chat photo: {e}")
         if os.path.exists(path):
-            self.account['photo'] = ACCOUNT_PHOTO
+            self.account['photo'] = photo
 
     async def list_messages(self) -> None:
         options = self.options
@@ -247,6 +248,7 @@ class ChatExport:
     def list_medium(self, message, item: dict, known: dict | None) -> dict | None:
         """The message's medium as listing records it: on disk, left out by a setting, or pending."""
         path = known.get('path') if known else None
+        thumbnail = known.get('thumbnail') if known else None
         if message.contact is not None:
             medium = {'kind': 'contact', 'contact': records.contact_fields(message.contact),
                       'path': path or media_path(item['date'][:7], f"{item['id']}.vcf")}
@@ -264,6 +266,8 @@ class ChatExport:
             return None
         kind, media = found
         medium = {**describe(kind, media), 'path': path or media_path(item['date'][:7], file_name(item['id'], media, kind))}
+        if thumbnail:
+            medium['thumbnail'] = thumbnail
         if os.path.exists(self.full_path(medium['path'])):
             self.mark_downloaded(medium, item)
         else:
@@ -272,11 +276,15 @@ class ChatExport:
                              or states.pending())
         return medium
 
+    def thumbnail_of(self, medium: dict, item: dict) -> str:
+        return medium.get('thumbnail') or thumbnail_path(item['date'][:7], item['id'])
+
     def mark_downloaded(self, medium: dict, item: dict) -> None:
         states.set_state(medium, states.downloaded())
         if not medium.get('size'):
             medium['size'] = os.path.getsize(self.full_path(medium['path']))
-        thumbnail = thumbnail_path(item['date'][:7], item['id'])
+        thumbnail = self.thumbnail_of(medium, item)
+        medium.pop('thumbnail', None)
         if os.path.exists(self.full_path(thumbnail)):
             medium['thumbnail'] = thumbnail
 
@@ -299,7 +307,7 @@ class ChatExport:
                 states.set_state(medium, states.failed(error))
                 return
             self.downloaded_total += size or os.path.getsize(path)
-        thumbnail = self.full_path(thumbnail_path(item['date'][:7], item['id']))
+        thumbnail = self.full_path(self.thumbnail_of(medium, item))
         thumbs = getattr(media, 'thumbs', None)
         if not os.path.exists(thumbnail) and (thumbs or kind.kind == 'photo'):
             thumb_id = photo_size_id(media.file_id, 'm') if kind.kind == 'photo' else thumbs[0].file_id
