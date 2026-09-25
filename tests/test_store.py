@@ -5,7 +5,7 @@ import sqlite3
 import tempfile
 import unittest
 
-from telegram_archive.store import Archive, ArchiveVersionError, find_export_dir, is_export_dir
+from telegram_archive.store import Archive, ArchiveVersionError, find_archive, is_export_dir, new_archive_dir, read_account
 
 
 class Folders(unittest.TestCase):
@@ -15,24 +15,27 @@ class Folders(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.dir, ignore_errors=True)
 
-    def make(self, *names):
-        for name in names:
-            os.makedirs(os.path.join(self.dir, name))
+    def make(self, name, account=None):
+        archive = Archive(os.path.join(self.dir, name))
+        if account:
+            archive.set('account', account)
+            archive.commit()
+        archive.close()
 
-    def test_the_newest_own_folder_is_continued(self):
-        self.make('ChatExport_durov_2024-01-01', 'ChatExport_durov_2025-01-01', 'ChatExport_durov_bot_2026-01-01',
-                  'ChatExport_durov_2026-01-01 copy')
-        self.assertEqual(os.path.basename(find_export_dir(self.dir, 'durov', True)), 'ChatExport_durov_2025-01-01')
+    def test_archives_are_found_by_their_account(self):
+        self.make('b', {'id': 'channel1'})
+        self.make('a', {'id': 'channel2'})
+        os.makedirs(os.path.join(self.dir, 'not an archive'))
+        self.assertEqual(read_account(os.path.join(self.dir, 'b')), {'id': 'channel1'})
+        self.assertEqual(find_archive(self.dir, lambda a: a['id'] == 'channel1'), os.path.join(self.dir, 'b'))
+        self.assertIsNone(find_archive(self.dir, lambda a: a['id'] == 'channel3'))
+        self.assertIsNone(find_archive(os.path.join(self.dir, 'missing'), lambda a: True))
 
-    def test_a_new_folder_is_dated_today(self):
-        self.make('ChatExport_durov_2024-01-01')
-        self.assertRegex(os.path.basename(find_export_dir(self.dir, 'durov', False)), r'^ChatExport_durov_\d{4}-\d{2}-\d{2}$')
-        self.assertRegex(os.path.basename(find_export_dir(self.dir, 'telegram', True)), r'^ChatExport_telegram_')
-
-    def test_glob_characters_in_paths(self):
-        output = os.path.join(self.dir, 'a [b] *')
-        os.makedirs(os.path.join(output, 'ChatExport_x[1]_2024-01-01'))
-        self.assertEqual(find_export_dir(output, 'x[1]', True), os.path.join(output, 'ChatExport_x[1]_2024-01-01'))
+    def test_new_folders_do_not_reuse_a_name(self):
+        self.assertEqual(new_archive_dir(self.dir, 'telegram-durov'), os.path.join(self.dir, 'telegram-durov'))
+        self.make('telegram-durov')
+        self.assertEqual(new_archive_dir(self.dir, 'telegram-durov'), os.path.join(self.dir, 'telegram-durov-2'))
+        self.assertEqual(new_archive_dir(self.dir, 'a:b'), os.path.join(self.dir, 'a_b'))
 
 
 class Saving(unittest.TestCase):

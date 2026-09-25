@@ -48,29 +48,31 @@ class ExportAll(ExportRun):
 
 
 class ExportFolders(ExportRun):
-    def test_an_export_goes_to_chatexport_username_date(self):
+    def test_an_archive_goes_to_telegram_username(self):
         self.run_bot(count=3)
-        [name] = os.listdir(self.out)
-        self.assertRegex(name, r'^ChatExport_testchat_\d{4}-\d{2}-\d{2}$')
+        self.assertEqual(os.listdir(self.out), ['telegram-testchat'])
 
     def test_a_chat_without_username_uses_its_id(self):
         self.run_bot(count=3, username=None)
-        [name] = os.listdir(self.out)
-        self.assertRegex(name, r'^ChatExport_-1001234_\d{4}-\d{2}-\d{2}$')
+        self.assertEqual(os.listdir(self.out), ['telegram-channel1234'])
 
-    def test_the_newest_existing_folder_is_continued(self):
-        for day in ('2024-01-01', '2025-06-30'):
-            os.makedirs(os.path.join(self.out, f'ChatExport_testchat_{day}'))
-        self.assertEqual(self.run_bot(count=3), 0, self.output)
-        self.assertEqual(sorted(os.listdir(self.out)), ['ChatExport_testchat_2024-01-01', 'ChatExport_testchat_2025-06-30'])
-        self.assertTrue(os.path.exists(os.path.join(self.out, 'ChatExport_testchat_2025-06-30', 'archive.db')))
+    def test_an_archive_is_found_by_its_account_whatever_its_folder_is_called(self):
+        self.run_bot(count=3)
+        os.rename(self.path(), os.path.join(self.out, 'my channel'))
+        self.assertEqual(self.run_bot(count=5), 0, self.output)
+        self.assertEqual(os.listdir(self.out), ['my channel'])
+        self.assertEqual(self.listed_ids(), [5, 4, 3])
 
-    def test_a_folder_of_a_chat_whose_name_starts_the_same_is_not_continued(self):
-        os.makedirs(os.path.join(self.out, 'ChatExport_testchat_2024-01-01'))
-        os.makedirs(os.path.join(self.out, 'ChatExport_testchat_bot_2024-01-01'))
+    def test_a_chat_that_changed_its_username_keeps_its_archive(self):
+        self.run_bot(count=3)
+        self.assertEqual(self.run_bot(count=5, username='renamed'), 0, self.output)
+        self.assertEqual(os.listdir(self.out), ['telegram-testchat'])
+        self.assertEqual(self.archive()['account']['username'], 'renamed')
+
+    def test_another_chat_by_the_same_name_gets_its_own_folder(self):
+        self.run_bot(count=3, chat_id=-1005555)
         self.assertEqual(self.run_bot(count=3), 0, self.output)
-        self.assertTrue(os.path.exists(os.path.join(self.out, 'ChatExport_testchat_2024-01-01', 'archive.db')))
-        self.assertEqual(os.listdir(os.path.join(self.out, 'ChatExport_testchat_bot_2024-01-01')), [])
+        self.assertEqual(sorted(os.listdir(self.out)), ['telegram-testchat', 'telegram-testchat-2'])
 
     def test_an_output_folder_with_brackets_is_found_again(self):
         self.out = os.path.join(self.dir, 'out [1]')
@@ -80,10 +82,9 @@ class ExportFolders(ExportRun):
         self.assertEqual(self.listed_ids(), [5, 4, 3])
 
     def test_resume_disabled_starts_a_fresh_folder(self):
-        os.makedirs(os.path.join(self.out, 'ChatExport_testchat_2024-01-01'))
+        self.run_bot(count=3)
         self.assertEqual(self.run_bot(count=3, env={'RESUME_ENABLED': 'False'}), 0, self.output)
-        self.assertEqual(len(os.listdir(self.out)), 2)
-
+        self.assertEqual(sorted(os.listdir(self.out)), ['telegram-testchat', 'telegram-testchat-2'])
 
 if __name__ == '__main__':
     unittest.main()

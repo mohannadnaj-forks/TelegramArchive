@@ -16,7 +16,7 @@ from dotenv import load_dotenv
 from .download import Downloader
 from .export import ChatExport, RunOptions, StopRequest
 from .settings import Settings
-from .store import Archive, ArchiveVersionError, find_export_dir, is_export_dir
+from .store import Archive, ArchiveVersionError, find_archive, is_export_dir
 from .telegram import api_chat_id, create_client, dialog_ids
 from .viewer import generate_index_html
 
@@ -63,16 +63,26 @@ def build_parser(download_path: str | None) -> argparse.ArgumentParser:
     return parser
 
 
-def rebuild_viewers(targets: list, output: str, resume: bool) -> None:
+def is_named(account: dict, chat) -> bool:
+    """Whether the chat named on the command line (a username, 'me' or an id in either form) is this account."""
+    if isinstance(chat, int):
+        return re.sub(r'^\D+', '', account.get('id', '')) in (str(abs(chat)), str(chat).removeprefix('-100'))
+    if chat == 'me':
+        return account.get('kind') == 'saved'
+    return (account.get('username') or '').lower() == chat.lower()
+
+
+def rebuild_viewers(targets: list, output: str) -> None:
     for target in targets:
         if is_export_dir(target):
             export_directory, name = os.path.abspath(target), target
         else:
-            name = str(parse_chat(target))
-            export_directory = find_export_dir(output, name, resume)
-        if not is_export_dir(export_directory):
-            print(f"❌ No archive under {export_directory}")
-            continue
+            chat = parse_chat(target)
+            name = str(chat)
+            export_directory = find_archive(output, lambda account: is_named(account, chat))
+            if export_directory is None:
+                print(f"❌ No archive of {name} under {output}")
+                continue
         try:
             archive = Archive(export_directory)
         except ArchiveVersionError as e:
@@ -151,7 +161,7 @@ def run(argv: list, env: Mapping[str, str], client_factory=create_client, sessio
         zone=zone,
     )
     if args.viewer_only:
-        rebuild_viewers(args.chats, options.output, settings.resume_enabled)
+        rebuild_viewers(args.chats, options.output)
         return
 
     if not (settings.api_id or '').strip().isdigit() or not settings.api_hash:

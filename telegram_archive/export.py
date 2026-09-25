@@ -13,7 +13,7 @@ from . import __version__, records, states
 from .download import Downloader, LowDiskSpace
 from .media import MediaKind, describe, file_name, find_media, media_path, photo_size_id, thumbnail_path
 from .settings import Settings, media_setting_name
-from .store import Archive, find_export_dir
+from .store import Archive, find_archive, new_archive_dir
 from .viewer import generate_index_html
 
 logger = logging.getLogger(__name__)
@@ -88,10 +88,12 @@ class ChatExport:
         self.downloader = downloader or Downloader(client, settings)
         self.clock = clock
         self.username = chat.username or str(chat.id)
+        account = records.account_fields(chat, saved=cid == 'me')
         # Messages already exported are kept, also ones since deleted or outside this run's date range.
-        self.archive = Archive(find_export_dir(options.output, self.username, settings.resume_enabled))
+        existing = find_archive(options.output, lambda a: a.get('id') == account['id']) if settings.resume_enabled else None
+        self.archive = Archive(existing or new_archive_dir(options.output, f"telegram-{chat.username or account['id']}"))
         self.directory = self.archive.path
-        self.account = {**self.archive.get('account', {}), **records.account_fields(chat, saved=cid == 'me')}
+        self.account = {**self.archive.get('account', {}), **account}
         if self.archive.get('created') is None:
             self.archive.set('source', 'telegram')
             self.archive.set('created', self.now())

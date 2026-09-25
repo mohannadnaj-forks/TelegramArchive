@@ -3,12 +3,10 @@
 docs/export-format.md describes the format. Changes are saved in a transaction that commit() ends,
 so a run that is killed keeps everything up to its last commit.
 """
-import glob
 import json
 import os
 import re
 import sqlite3
-from datetime import datetime
 
 ARCHIVE_FILE = 'archive.db'
 FORMAT = 'archive'
@@ -31,17 +29,44 @@ class ArchiveVersionError(Exception):
     pass
 
 
-def find_export_dir(output: str, username: str, resume: bool) -> str:
-    """The newest ChatExport_<username>_<date> folder under output, or a new one dated today."""
-    pattern = os.path.join(glob.escape(output), f'ChatExport_{glob.escape(username)}_*')
-    own = re.compile(rf'ChatExport_{re.escape(username)}_\d{{4}}-\d{{2}}-\d{{2}}')
-    existing = sorted(p for p in glob.glob(pattern) if own.fullmatch(os.path.basename(p))) if resume else []
-    today = datetime.now().strftime("%Y-%m-%d")
-    return existing[-1] if existing else os.path.join(output, f'ChatExport_{username}_{today}')
-
-
 def is_export_dir(path: str) -> bool:
     return os.path.isfile(os.path.join(path, ARCHIVE_FILE))
+
+
+def read_account(path: str) -> dict | None:
+    """The account of the archive in the folder at path, or None."""
+    try:
+        db = sqlite3.connect(os.path.join(path, ARCHIVE_FILE))
+        try:
+            row = db.execute("SELECT value FROM archive WHERE key = 'account'").fetchone()
+        finally:
+            db.close()
+    except sqlite3.Error:
+        return None
+    return json.loads(row[0]) if row else None
+
+
+def find_archive(output: str, matches) -> str | None:
+    """The folder under output whose archive's account matches, if any."""
+    if not os.path.isdir(output):
+        return None
+    for name in sorted(os.listdir(output)):
+        path = os.path.join(output, name)
+        if is_export_dir(path):
+            account = read_account(path)
+            if account and matches(account):
+                return path
+    return None
+
+
+def new_archive_dir(output: str, name: str) -> str:
+    """output/name, or output/name-2, -3 … when that folder exists."""
+    name = re.sub(r'[<>:"/\\|?*\x00-\x1f]', '_', name).strip(' .') or 'archive'
+    path, number = os.path.join(output, name), 1
+    while os.path.exists(path):
+        number += 1
+        path = os.path.join(output, f'{name}-{number}')
+    return path
 
 
 def dumps(value) -> str:

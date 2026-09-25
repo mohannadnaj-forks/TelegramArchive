@@ -92,6 +92,13 @@ class ViewerOnly(ViewerRun):
         self.assertEqual(self.viewer_only('https://t.me/testchat'), 0, self.output)
         self.assertEqual(self.index()['total'], 30)
 
+    def test_finds_the_archive_by_id_in_either_form(self):
+        self.run_bot(count=30)
+        for chat in ('1234', '-1001234'):
+            os.remove(self.path('data', 'index.js'))
+            self.assertEqual(self.viewer_only(chat), 0, self.output)
+            self.assertEqual(self.index()['total'], 30)
+
     def test_includes_what_a_killed_run_saved(self):
         self.run_bot(count=100, checkpoint_seconds=0, kill_after_listed=40)
         self.assertEqual(self.viewer_only(self.export_dir()), 0, self.output)
@@ -99,7 +106,7 @@ class ViewerOnly(ViewerRun):
 
     def test_a_chat_without_an_export_is_reported(self):
         self.assertEqual(self.viewer_only('nobody'), 0, self.output)
-        self.assertIn('No archive under', self.output)
+        self.assertIn('No archive of nobody under', self.output)
         self.assertFalse(os.path.exists(self.out))
 
     def test_all_is_refused(self):
