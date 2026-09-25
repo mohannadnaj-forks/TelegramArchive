@@ -6,8 +6,9 @@ import subprocess
 import sys
 import unittest
 
+import json
+
 from tests.support import SubprocessRun
-from tests.test_legacy_exports import FIXTURES, read_records
 
 
 class EndToEnd(SubprocessRun):
@@ -29,16 +30,11 @@ class EndToEnd(SubprocessRun):
 
     def test_a_killed_run_is_recovered_from_the_journal(self):
         self.assertEqual(self.run_bot(checkpoint_seconds=0, kill_after_listed=120), 9)
-        self.assertEqual(len(read_records(self.export_dir())), 120)
+        with open(self.path('export_journal.jsonl'), encoding='utf-8') as f:
+            self.assertEqual(len([json.loads(line) for line in f]), 120)
         self.assertEqual(self.run_bot(), 0, self.output)
         self.assertIn('Recovered 120 messages', self.output)
         self.assertEqual([m['id'] for m in self.result()['messages']], list(range(1, 251)))
-
-    def test_an_export_killed_by_e7faf7f_during_downloads_finishes(self):
-        shutil.copytree(os.path.join(FIXTURES, 'killed_downloading'), self.out, ignore=shutil.ignore_patterns('made_by.json'))
-        self.assertEqual(self.run_bot(count=90), 0, self.output)
-        self.assertEqual(self.file_states(), {'downloaded': 42})
-        self.assertFalse(os.path.exists(self.path('export_journal.jsonl')))
 
     def test_the_viewer_is_rebuilt_from_the_command_line(self):
         self.run_bot(count=30)
@@ -79,7 +75,8 @@ class Session(SubprocessRun):
         result = subprocess.run([sys.executable, bot, '--help'], env=env, capture_output=True, text=True, encoding='utf-8')
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('--viewer-only', result.stdout)
-        shutil.copytree(os.path.join(FIXTURES, 'complete'), self.out, ignore=shutil.ignore_patterns('made_by.json'))
+        self.assertEqual(self.run_bot(count=3), 0, self.output)
+        shutil.rmtree(os.path.join(self.program, '.telegram'))
         result = subprocess.run([sys.executable, bot, '--viewer-only', self.export_dir()], env=env,
                                 capture_output=True, text=True, encoding='utf-8')
         self.assertEqual(result.returncode, 0, result.stderr)

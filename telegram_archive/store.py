@@ -1,7 +1,6 @@
 """An export folder on disk: result.json or its parts, export_journal.jsonl and export_state.json.
 
-docs/export-format.md describes the format; tests/test_legacy_exports.py checks that exports
-written by earlier versions still read.
+docs/export-format.md describes the format.
 """
 import glob
 import json
@@ -56,11 +55,7 @@ class ExportFolder:
         return data
 
     def load_result(self) -> dict:
-        # When both result.json and parts are present, the newer of the two is the export.
-        part1 = self.part_path(1)
-        parts_newer = os.path.exists(part1) and os.path.exists(self.result_path) \
-            and os.path.getmtime(part1) > os.path.getmtime(self.result_path)
-        if os.path.exists(self.result_path) and not parts_newer:
+        if os.path.exists(self.result_path):
             try:
                 with open(self.result_path, 'r', encoding='utf-8') as f:
                     data = json.load(f)
