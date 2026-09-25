@@ -5,6 +5,7 @@ import time
 from dataclasses import dataclass
 from datetime import datetime
 
+from pyrogram.errors import FloodWait
 from tqdm_loggable.auto import tqdm
 
 from . import file_status, records
@@ -176,24 +177,32 @@ class ChatExport:
         bound, offset_date = 0, options.until
         while True:
             top, lowest, covered = bound or None, None, None
-            async for message in self.client.get_chat_history(self.cid, max_id=bound, offset_date=offset_date):
-                self.stop.check()
-                if bound and message.id > bound:
-                    continue
-                if options.since is not None and message.date is not None and message.date < options.since:
-                    return
-                covered = next((r for r in skip if r[0] <= message.id <= r[1]), None)
-                if covered:
-                    break
-                self.exported[message.id] = await self.list_message(message, bar)
-                self.dirty.add(message.id)
-                top = top or message.id
-                lowest = message.id
-                self.cover(lowest, top)
-                listed = self.state['run']['listed_this_run'] = self.state['run']['listed_this_run'] + 1
-                if listed % 1000 == 0:
-                    print(f"📥 Listed {listed:,} messages this run, back to {message.date:%Y-%m-%d} ({self.clock() - started:.0f}s)")
-                self.save()
+            try:
+                async for message in self.client.get_chat_history(self.cid, max_id=bound, offset_date=offset_date):
+                    self.stop.check()
+                    if bound and message.id > bound:
+                        continue
+                    if options.since is not None and message.date is not None and message.date < options.since:
+                        return
+                    covered = next((r for r in skip if r[0] <= message.id <= r[1]), None)
+                    if covered:
+                        break
+                    self.exported[message.id] = await self.list_message(message, bar)
+                    self.dirty.add(message.id)
+                    top = top or message.id
+                    lowest = message.id
+                    self.cover(lowest, top)
+                    listed = self.state['run']['listed_this_run'] = self.state['run']['listed_this_run'] + 1
+                    if listed % 1000 == 0:
+                        print(f"📥 Listed {listed:,} messages this run, back to {message.date:%Y-%m-%d} ({self.clock() - started:.0f}s)")
+                    self.save()
+            except FloodWait as e:
+                await self.wait_out(e)
+                if lowest is not None:
+                    bound, offset_date = lowest - 1, None
+                    if bound < 1:
+                        return
+                continue
             if covered is None:
                 # The history ended: everything below what was listed is covered too.
                 if top:
@@ -204,6 +213,19 @@ class ChatExport:
             bound, offset_date = covered[0] - 1, None
             if bound < 1:
                 return
+
+    async def wait_out(self, flood: FloodWait) -> None:
+        if flood.value > self.settings.flood_wait_max_sleep:
+            raise flood
+        print(f"🚦 Telegram asks to wait {flood.value}s before continuing; waiting")
+        await self.downloader.sleep(flood.value)
+
+    async def get_messages(self, message_ids: list) -> list:
+        while True:
+            try:
+                return await self.client.get_messages(self.chat.id, message_ids)
+            except FloodWait as e:
+                await self.wait_out(e)
 
     async def list_message(self, message, pbar) -> dict:
         record = records.message_fields(self.chat, message)
@@ -304,7 +326,7 @@ class ChatExport:
                     self.stop.check()
                     # File references inside fetched messages expire, so the rest of a chunk is re-read when they get old.
                     if fetched_at is None or self.clock() - fetched_at > FILE_REFERENCE_MAX_AGE:
-                        fresh = await self.client.get_messages(self.chat.id, chunk[position:])
+                        fresh = await self.get_messages(chunk[position:])
                         messages = {m.id: m for m in fresh if m is not None and not m.empty}
                         fetched_at = self.clock()
                     message = messages.get(message_id)

@@ -285,7 +285,8 @@ def make_fake_client(scenario: dict, kill=lambda: os._exit(9)) -> type:
         async def get_messages(self, chat_id, message_ids):
             message_ids = list(message_ids)
             log({'call': 'get_messages', 'ids': message_ids})
-            if scenario.get('get_messages_error'):
+            counters['get_messages'] = counters.get('get_messages', 0) + 1
+            if scenario.get('get_messages_error') and counters['get_messages'] <= scenario.get('get_messages_errors', 10 ** 9):
                 fail(scenario['get_messages_error'])
             present = set(ids) - gone_later
             return [make_message(i, fetch=True) if i in present else SimpleNamespace(id=i, empty=True) for i in message_ids]

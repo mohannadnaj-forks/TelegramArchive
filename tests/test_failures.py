@@ -91,8 +91,20 @@ class LowDiskSpace(ExportRun):
 
 
 class FailuresOutsideDownloads(ExportRun):
-    def test_a_flood_wait_while_listing_stops_the_run_with_the_listing_kept(self):
-        self.assertNotEqual(self.run_bot(history_errors={'50': 'flood:30'}), 0)
+    def test_a_flood_wait_while_listing_is_waited_out_and_the_listing_continues(self):
+        self.assertEqual(self.run_bot(history_errors={'50': 'flood:30'}), 0, self.output)
+        self.assertEqual(self.sleeps(), [30])
+        self.assertEqual(self.listed_ids(), list(range(250, 201, -1)) + list(range(201, 0, -1)))
+        self.assertEqual(len(self.result()['messages']), 250)
+        self.assertEqual(self.state()['listed'], [[1, 250]])
+
+    def test_a_flood_wait_while_fetching_for_downloads_is_waited_out(self):
+        self.assertEqual(self.run_bot(get_messages_error='flood:20', get_messages_errors=1), 0, self.output)
+        self.assertEqual(self.sleeps(), [20])
+        self.assertEqual(self.file_states(), {'downloaded': 117})
+
+    def test_a_flood_wait_while_listing_longer_than_the_maximum_stops_the_run_with_the_listing_kept(self):
+        self.assertNotEqual(self.run_bot(history_errors={'50': 'flood:30'}, env={'FLOOD_WAIT_MAX_SLEEP': 10}), 0)
         self.assertIn('FLOOD_WAIT', self.output)
         self.assertEqual(len(self.result()['messages']), 49)
         self.assertEqual(self.state()['run']['status'], 'failed')
