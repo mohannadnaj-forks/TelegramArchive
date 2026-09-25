@@ -34,10 +34,10 @@ class ViewerData(ViewerRun):
     def test_months_counts_and_chunks(self):
         self.assertEqual(self.run_bot(count=1500, env={'MEDIA_EXPORT_VIDEOS': 'False'}), 0, self.output)
         index = self.index()
-        self.assertEqual(index['source'], 'telegram')
-        self.assertEqual(index['chat'], {'username': 'testchat', 'name': 'Test', 'type': 'public_channel', 'id': '1234'})
+        self.assertEqual((index['format'], index['version'], index['source']), ('archive', 1, 'telegram'))
+        self.assertEqual(index['account'], self.archive()['account'])
         self.assertEqual(index['total'], 1500)
-        self.assertRegex(index['updated'], r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$')
+        self.assertRegex(index['updated'], r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+00:00$')
         self.assertEqual([m['key'] for m in index['months']], ['2024-01', '2024-02', '2024-03'])
         january = index['months'][0]
         # ids 1..743 are in January (hour 744 is 1 February 00:00)
@@ -46,34 +46,33 @@ class ViewerData(ViewerRun):
         self.assertEqual(january, {
             'key': '2024-01', 'count': 743, 'video': videos, 'photo': photos, 'other': 0, 'text': 743 - photos - videos,
             'missing': videos,
-            'chunks': [{'name': '2024-01', 'count': 743, 'first_id': 1, 'last_id': 743,
-                        'first_date': '2024-01-01T01:00:00', 'last_date': '2024-01-31T23:00:00', 'missing': videos}]})
-        records = {m['id']: m for m in self.result()['messages']}
-        self.assertEqual(self.chunk('2024-01'), [records[i] for i in range(1, 744)])
-        self.assertEqual(self.search()[:2], [[1, '2024-01-01T01:00', 'message 1'], [2, '2024-01-01T02:00', 'message 2']])
-        self.assertEqual(self.search()[2], [3, '2024-01-01T03:00', ''])
+            'chunks': [{'name': '2024-01', 'count': 743, 'first_id': '1', 'last_id': '743',
+                        'first_date': '2024-01-01T01:00:00+00:00', 'last_date': '2024-01-31T23:00:00+00:00',
+                        'missing': videos}]})
+        items = self.items()
+        self.assertEqual(self.chunk('2024-01'), [items[i] for i in range(1, 744)])
+        self.assertEqual(self.search()[:2], [['1', '2024-01-01T01:00', 'message 1'], ['2', '2024-01-01T02:00', 'message 2']])
+        self.assertEqual(self.search()[2], ['3', '2024-01-01T03:00', ''])
         with open(os.path.join(ROOT, '_index.html'), encoding='utf-8') as template, \
                 open(self.path('index.html'), encoding='utf-8') as page:
             self.assertEqual(page.read(), template.read())
 
-    def test_search_rows_join_text_caption_and_forwarded_from(self):
+    def test_search_rows_join_the_text_and_the_forward_origin(self):
         env = {'MEDIA_EXPORT_DOCUMENTS': 'True'}
         self.assertEqual(self.run_bot(count=20, messages='rich', env=env), 0, self.output)
-        rows = {row[0]: row[2] for row in self.search()}
+        rows = {int(row[0]): row[2] for row in self.search()}
         self.assertEqual(rows[2], '😀 bold and a link, `code`')
         self.assertEqual(rows[3], 'Photo #news')
         self.assertEqual(rows[18], 'forwarded from a channel Other Channel')
         index = self.index()['months'][0]
-        self.assertEqual((index['photo'], index['video'], index['other'], index['text']), (4, 4, 5, 7))
+        self.assertEqual((index['photo'], index['video'], index['other'], index['text']), (4, 4, 6, 6))
 
     def test_files_from_an_earlier_build_are_removed(self):
         self.run_bot(count=10)
         for name in ('2019-01.js', 'stale.txt'):
             open(self.path('data', name), 'w').close()
-        open(self.path('data.js'), 'w').close()
         self.assertEqual(self.run_bot(count=10), 0, self.output)
         self.assertEqual(sorted(os.listdir(self.path('data'))), ['2024-01.js', 'index.js', 'search.js'])
-        self.assertFalse(os.path.exists(self.path('data.js')))
 
 
 class ViewerOnly(ViewerRun):

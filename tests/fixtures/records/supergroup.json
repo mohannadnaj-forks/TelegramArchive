@@ -1,438 +1,589 @@
 {
- "username": "testchat",
- "name": "Test",
- "type": "public_supergroup",
- "id": "1234",
- "messages": [
+ "account": {
+  "id": "channel1234",
+  "kind": "group",
+  "public": true,
+  "name": "Test",
+  "username": "testchat",
+  "url": "https://t.me/testchat",
+  "counts": {
+   "items": 30
+  }
+ },
+ "items": [
   {
-   "id": 1,
-   "type": "message",
-   "date": "2024-01-01T01:00:00",
-   "from": "Pavel D",
-   "from_id": "user42",
-   "text": ""
+   "id": "1",
+   "date": "2024-01-01T01:00:00+00:00",
+   "author": {
+    "id": "user42",
+    "name": "Pavel D"
+   },
+   "url": "https://t.me/testchat/1"
   },
   {
-   "id": 2,
-   "type": "message",
-   "date": "2024-01-01T02:00:00",
-   "from": "Pavel D",
-   "from_id": "user42",
-   "text": [
+   "id": "2",
+   "date": "2024-01-01T02:00:00+00:00",
+   "author": {
+    "id": "user42",
+    "name": "Pavel D"
+   },
+   "text": {
+    "plain": "😀 bold and a link, `code`",
+    "entities": [
+     {
+      "type": "bold",
+      "offset": 3,
+      "length": 4
+     },
+     {
+      "type": "text_link",
+      "offset": 14,
+      "length": 4,
+      "url": "https://example.com"
+     },
+     {
+      "type": "pre",
+      "offset": 20,
+      "length": 6
+     },
+     {
+      "type": "italic",
+      "offset": 3,
+      "length": 8
+     }
+    ]
+   },
+   "url": "https://t.me/testchat/2"
+  },
+  {
+   "id": "3",
+   "date": "2024-01-01T03:00:00+00:00",
+   "author": {
+    "id": "user42",
+    "name": "Pavel D"
+   },
+   "text": {
+    "plain": "Photo #news",
+    "entities": [
+     {
+      "type": "hashtag",
+      "offset": 6,
+      "length": 5
+     }
+    ]
+   },
+   "url": "https://t.me/testchat/3",
+   "media": [
     {
-     "type": "bold",
-     "text": "bold",
-     "offset": 3,
-     "length": 4
-    },
-    {
-     "type": "text_link",
-     "href": "https://example.com",
-     "text": "link",
-     "offset": 14,
-     "length": 4
-    },
-    {
-     "type": "pre",
-     "language": "",
-     "text": "`code`",
-     "offset": 20,
-     "length": 6
-    },
-    {
-     "type": "italic",
-     "text": "bold and",
-     "offset": 3,
-     "length": 8
-    },
-    "😀 bold and a link, `code`"
+     "kind": "photo",
+     "size": 1003,
+     "width": 1280,
+     "height": 720,
+     "path": "media/2024-01/3.jpg",
+     "state": "downloaded",
+     "thumbnail": "media/2024-01/3.thumb.jpg"
+    }
    ]
   },
   {
-   "id": 3,
-   "type": "message",
-   "date": "2024-01-01T03:00:00",
-   "from": "Pavel D",
-   "from_id": "user42",
-   "width": 1280,
-   "height": 720,
-   "photo": "photos/photo_3.jpg",
-   "file_status": {
-    "state": "downloaded",
-    "size": 1003
+   "id": "4",
+   "date": "2024-01-01T04:00:00+00:00",
+   "author": {
+    "id": "user42",
+    "name": "Pavel D"
    },
-   "caption": [
+   "text": {
+    "plain": "An album"
+   },
+   "group": "900",
+   "url": "https://t.me/testchat/4",
+   "media": [
     {
-     "type": "hashtag",
-     "text": "#news",
-     "offset": 6,
-     "length": 5
-    },
-    "Photo #news"
-   ],
-   "thumbnail": "photos/photo_3.jpg_thumb.jpg"
+     "kind": "photo",
+     "size": 1004,
+     "width": 600,
+     "height": 800,
+     "path": "media/2024-01/4.jpg",
+     "state": "downloaded",
+     "thumbnail": "media/2024-01/4.thumb.jpg"
+    }
+   ]
   },
   {
-   "id": 4,
-   "type": "message",
-   "date": "2024-01-01T04:00:00",
-   "from": "Pavel D",
-   "from_id": "user42",
-   "media_group_id": "900",
-   "width": 600,
-   "height": 800,
-   "photo": "photos/photo_4.jpg",
-   "file_status": {
-    "state": "downloaded",
-    "size": 1004
+   "id": "5",
+   "date": "2024-01-01T05:00:00+00:00",
+   "author": {
+    "id": "user42",
+    "name": "Pavel D"
    },
-   "caption": "An album",
-   "thumbnail": "photos/photo_4.jpg_thumb.jpg"
+   "group": "900",
+   "url": "https://t.me/testchat/5",
+   "media": [
+    {
+     "kind": "photo",
+     "size": 1005,
+     "width": 600,
+     "height": 800,
+     "path": "media/2024-01/5.jpg",
+     "state": "downloaded",
+     "thumbnail": "media/2024-01/5.thumb.jpg"
+    }
+   ]
   },
   {
-   "id": 5,
-   "type": "message",
-   "date": "2024-01-01T05:00:00",
-   "from": "Pavel D",
-   "from_id": "user42",
-   "media_group_id": "900",
-   "width": 600,
-   "height": 800,
-   "photo": "photos/photo_5.jpg",
-   "file_status": {
-    "state": "downloaded",
-    "size": 1005
+   "id": "6",
+   "date": "2024-01-01T06:00:00+00:00",
+   "author": {
+    "id": "user42",
+    "name": "Pavel D"
    },
-   "text": "",
-   "thumbnail": "photos/photo_5.jpg_thumb.jpg"
+   "group": "900",
+   "url": "https://t.me/testchat/6",
+   "media": [
+    {
+     "kind": "photo",
+     "size": 1006,
+     "width": 600,
+     "height": 800,
+     "path": "media/2024-01/6.jpg",
+     "state": "downloaded",
+     "thumbnail": "media/2024-01/6.thumb.jpg"
+    }
+   ]
   },
   {
-   "id": 6,
-   "type": "message",
-   "date": "2024-01-01T06:00:00",
-   "from": "Pavel D",
-   "from_id": "user42",
-   "media_group_id": "900",
-   "width": 600,
-   "height": 800,
-   "photo": "photos/photo_6.jpg",
-   "file_status": {
-    "state": "downloaded",
-    "size": 1006
+   "id": "7",
+   "date": "2024-01-01T07:00:00+00:00",
+   "author": {
+    "id": "user42",
+    "name": "Pavel D"
    },
-   "text": "",
-   "thumbnail": "photos/photo_6.jpg_thumb.jpg"
-  },
-  {
-   "id": 7,
-   "type": "message",
-   "date": "2024-01-01T07:00:00",
-   "from": "Pavel D",
-   "from_id": "user42",
-   "media_type": "video_file",
-   "mime_type": "video/mp4",
-   "duration_seconds": 12.5,
-   "width": 1920,
-   "height": 1080,
-   "file": "video_files/7_Clip _1_.MP4",
-   "file_status": {
-    "state": "downloaded",
-    "size": 5007
+   "text": {
+    "plain": "A named video"
    },
-   "thumbnail": "video_files/7_Clip _1_.MP4_thumb.jpg",
-   "caption": "A named video"
+   "url": "https://t.me/testchat/7",
+   "media": [
+    {
+     "kind": "video",
+     "size": 5007,
+     "mime": "video/mp4",
+     "width": 1920,
+     "height": 1080,
+     "duration": 12.5,
+     "name": "Clip <1>.MP4",
+     "path": "media/2024-01/7_Clip _1_.MP4",
+     "state": "downloaded",
+     "thumbnail": "media/2024-01/7.thumb.jpg"
+    }
+   ]
   },
   {
-   "id": 8,
-   "type": "message",
-   "date": "2024-01-01T08:00:00",
-   "from": "Pavel D",
-   "from_id": "user42",
-   "media_type": "video_file",
-   "mime_type": "video/mp4",
-   "duration_seconds": 3,
-   "width": 640,
-   "height": 360,
-   "file": "video_files/video_8.mp4",
-   "file_status": {
-    "state": "downloaded",
-    "size": 5008
+   "id": "8",
+   "date": "2024-01-01T08:00:00+00:00",
+   "author": {
+    "id": "user42",
+    "name": "Pavel D"
    },
-   "thumbnail": "video_files/video_8.mp4",
-   "text": ""
+   "url": "https://t.me/testchat/8",
+   "media": [
+    {
+     "kind": "video",
+     "size": 5008,
+     "mime": "video/mp4",
+     "width": 640,
+     "height": 360,
+     "duration": 3,
+     "path": "media/2024-01/8.mp4",
+     "state": "downloaded"
+    }
+   ]
   },
   {
-   "id": 9,
-   "type": "message",
-   "date": "2024-01-01T09:00:00",
-   "from": "Pavel D",
-   "from_id": "user42",
-   "mime_type": "application/pdf",
-   "file": "files/9_report.pdf",
-   "file_status": {
-    "state": "downloaded",
-    "size": 3009
+   "id": "9",
+   "date": "2024-01-01T09:00:00+00:00",
+   "author": {
+    "id": "user42",
+    "name": "Pavel D"
    },
-   "thumbnail": "files/9_report.pdf",
-   "text": ""
+   "url": "https://t.me/testchat/9",
+   "media": [
+    {
+     "kind": "document",
+     "size": 3009,
+     "mime": "application/pdf",
+     "name": "report.pdf",
+     "path": "media/2024-01/9_report.pdf",
+     "state": "downloaded"
+    }
+   ]
   },
   {
-   "id": 10,
-   "type": "message",
-   "date": "2024-01-01T10:00:00",
-   "from": "Pavel D",
-   "from_id": "user42",
-   "mime_type": "application/zip",
-   "file": "files/document_10.zip",
-   "file_status": {
-    "state": "downloaded",
-    "size": 3010
+   "id": "10",
+   "date": "2024-01-01T10:00:00+00:00",
+   "author": {
+    "id": "user42",
+    "name": "Pavel D"
    },
-   "thumbnail": "files/document_10.zip",
-   "text": ""
+   "url": "https://t.me/testchat/10",
+   "media": [
+    {
+     "kind": "document",
+     "size": 3010,
+     "mime": "application/zip",
+     "path": "media/2024-01/10.zip",
+     "state": "downloaded"
+    }
+   ]
   },
   {
-   "id": 11,
-   "type": "message",
-   "date": "2024-01-01T11:00:00",
-   "from": "Pavel D",
-   "from_id": "user42",
-   "media_type": "audio_file",
-   "mime_type": "audio/mpeg",
-   "duration_seconds": 200,
-   "performer": "Artist",
-   "title": "Song",
-   "file": "files/11_song.mp3",
-   "file_status": {
-    "state": "downloaded",
-    "size": 4011
+   "id": "11",
+   "date": "2024-01-01T11:00:00+00:00",
+   "author": {
+    "id": "user42",
+    "name": "Pavel D"
    },
-   "thumbnail": "files/11_song.mp3",
-   "text": ""
+   "url": "https://t.me/testchat/11",
+   "media": [
+    {
+     "kind": "audio",
+     "size": 4011,
+     "mime": "audio/mpeg",
+     "duration": 200,
+     "title": "Song",
+     "performer": "Artist",
+     "name": "song.mp3",
+     "path": "media/2024-01/11_song.mp3",
+     "state": "downloaded"
+    }
+   ]
   },
   {
-   "id": 12,
-   "type": "message",
-   "date": "2024-01-01T12:00:00",
-   "from": "Pavel D",
-   "from_id": "user42",
-   "media_type": "voice_message",
-   "mime_type": "audio/ogg",
-   "duration_seconds": 4,
-   "file": "voice_messages/voice_12.oga",
-   "file_status": {
-    "state": "downloaded",
-    "size": 712
+   "id": "12",
+   "date": "2024-01-01T12:00:00+00:00",
+   "author": {
+    "id": "user42",
+    "name": "Pavel D"
    },
-   "text": ""
+   "url": "https://t.me/testchat/12",
+   "media": [
+    {
+     "kind": "voice",
+     "size": 712,
+     "mime": "audio/ogg",
+     "duration": 4,
+     "path": "media/2024-01/12.ogg",
+     "state": "downloaded"
+    }
+   ]
   },
   {
-   "id": 13,
-   "type": "message",
-   "date": "2024-01-01T13:00:00",
-   "from": "Pavel D",
-   "from_id": "user42",
-   "media_type": "sticker",
-   "mime_type": "image/webp",
-   "width": 512,
-   "height": 512,
-   "sticker_emoji": "👍",
-   "file": "stickers/sticker_13.webp",
-   "file_status": {
-    "state": "downloaded",
-    "size": 313
+   "id": "13",
+   "date": "2024-01-01T13:00:00+00:00",
+   "author": {
+    "id": "user42",
+    "name": "Pavel D"
    },
-   "thumbnail": "stickers/sticker_13.webp_thumb.jpg",
-   "text": ""
+   "url": "https://t.me/testchat/13",
+   "media": [
+    {
+     "kind": "sticker",
+     "size": 313,
+     "mime": "image/webp",
+     "width": 512,
+     "height": 512,
+     "emoji": "👍",
+     "path": "media/2024-01/13.webp",
+     "state": "downloaded",
+     "thumbnail": "media/2024-01/13.thumb.jpg"
+    }
+   ]
   },
   {
-   "id": 14,
-   "type": "message",
-   "date": "2024-01-01T14:00:00",
-   "from": "Pavel D",
-   "from_id": "user42",
-   "media_type": "animation",
-   "mime_type": "video/mp4",
-   "duration_seconds": 2,
-   "width": 320,
-   "height": 240,
-   "file": "video_files/animation_14.mp4",
-   "file_status": {
-    "state": "downloaded",
-    "size": 2014
+   "id": "14",
+   "date": "2024-01-01T14:00:00+00:00",
+   "author": {
+    "id": "user42",
+    "name": "Pavel D"
    },
-   "thumbnail": "video_files/animation_14.mp4",
-   "text": ""
+   "url": "https://t.me/testchat/14",
+   "media": [
+    {
+     "kind": "animation",
+     "size": 2014,
+     "mime": "video/mp4",
+     "width": 320,
+     "height": 240,
+     "duration": 2,
+     "path": "media/2024-01/14.mp4",
+     "state": "downloaded"
+    }
+   ]
   },
   {
-   "id": 15,
-   "type": "message",
-   "date": "2024-01-01T15:00:00",
-   "from": "Pavel D",
-   "from_id": "user42",
-   "media_type": "video_message",
-   "mime_type": "video/mp4",
-   "duration_seconds": 9,
-   "file": "round_video_messages/video_note_15.mp4",
-   "file_status": {
-    "state": "downloaded",
-    "size": 1515
+   "id": "15",
+   "date": "2024-01-01T15:00:00+00:00",
+   "author": {
+    "id": "user42",
+    "name": "Pavel D"
    },
-   "thumbnail": "round_video_messages/video_note_15.mp4_thumb.jpg",
-   "text": ""
+   "url": "https://t.me/testchat/15",
+   "media": [
+    {
+     "kind": "round_video",
+     "size": 1515,
+     "mime": "video/mp4",
+     "duration": 9,
+     "path": "media/2024-01/15.mp4",
+     "state": "downloaded",
+     "thumbnail": "media/2024-01/15.thumb.jpg"
+    }
+   ]
   },
   {
-   "id": 16,
-   "type": "message",
-   "date": "2024-01-01T16:00:00",
-   "from": "Pavel D",
-   "from_id": "user42",
-   "contact_information": {
-    "phone_number": "+10000000000",
-    "fist_name": "Ada",
-    "last_name": ""
+   "id": "16",
+   "date": "2024-01-01T16:00:00+00:00",
+   "author": {
+    "id": "user42",
+    "name": "Pavel D"
    },
-   "contact_vcard": "contacts/contact_16.vcf",
-   "text": ""
+   "url": "https://t.me/testchat/16",
+   "media": [
+    {
+     "kind": "contact",
+     "contact": {
+      "phone": "+10000000000",
+      "first_name": "Ada"
+     },
+     "path": "media/2024-01/16.vcf",
+     "state": "downloaded"
+    }
+   ]
   },
   {
-   "id": 17,
-   "type": "message",
-   "date": "2024-01-01T17:00:00",
-   "from": "Pavel D",
-   "from_id": "user42",
-   "location_information": {
+   "id": "17",
+   "date": "2024-01-01T17:00:00+00:00",
+   "author": {
+    "id": "user42",
+    "name": "Pavel D"
+   },
+   "location": {
     "latitude": 51.5,
     "longitude": -0.12
    },
-   "text": ""
+   "url": "https://t.me/testchat/17"
   },
   {
-   "id": 18,
-   "type": "message",
-   "date": "2024-01-01T18:00:00",
-   "from": "Pavel D",
-   "from_id": "user42",
-   "forwarded_from": "Other Channel",
-   "text": "forwarded from a channel"
-  },
-  {
-   "id": 19,
-   "type": "message",
-   "date": "2024-01-01T19:00:00",
-   "from": "Pavel D",
-   "from_id": "user42",
-   "forwarded_from": "Nikolai",
-   "text": "forwarded from a person"
-  },
-  {
-   "id": 20,
-   "type": "message",
-   "date": "2024-01-01T20:00:00",
-   "from": "Pavel D",
-   "from_id": "user42",
-   "reply_to_message_id": 2,
-   "text": "a reply"
-  },
-  {
-   "id": 21,
-   "type": "message",
-   "date": "2024-01-01T21:00:00",
-   "from": "Pavel D",
-   "from_id": "user42",
-   "media_type": "video_file",
-   "mime_type": "video/mp4",
-   "duration_seconds": 600,
-   "width": 1920,
-   "height": 1080,
-   "file": "(File exceeds maximum size. Change data exporting settings to download.)",
-   "file_status": {
-    "state": "too_large",
-    "size": 524288000,
-    "limit": 209715200
+   "id": "18",
+   "date": "2024-01-01T18:00:00+00:00",
+   "author": {
+    "id": "user42",
+    "name": "Pavel D"
    },
-   "thumbnail": "(File exceeds maximum size. Change data exporting settings to download.)",
-   "text": ""
-  },
-  {
-   "id": 22,
-   "type": "message",
-   "date": "2024-01-01T22:00:00",
-   "from": "Linked Channel",
-   "from_id": "channel5678",
-   "text": "posted as a channel"
-  },
-  {
-   "id": 23,
-   "type": "message",
-   "date": "2024-01-01T23:00:00",
-   "from": "Solo",
-   "from_id": "user43",
-   "text": "no last name"
-  },
-  {
-   "id": 24,
-   "type": "message",
-   "date": "2024-01-02T00:00:00",
-   "from": "Pavel D",
-   "from_id": "user42",
-   "text": "message 24"
-  },
-  {
-   "id": 25,
-   "type": "message",
-   "date": "2024-01-02T01:00:00",
-   "from": "Pavel D",
-   "from_id": "user42",
-   "width": 100,
-   "height": 100,
-   "photo": "photos/photo_25.jpg",
-   "file_status": {
-    "state": "downloaded",
-    "size": 1025
+   "text": {
+    "plain": "forwarded from a channel"
    },
-   "text": "",
-   "thumbnail": "photos/photo_25.jpg_thumb.jpg"
+   "forward": {
+    "from": {
+     "id": "channel9999",
+     "name": "Other Channel",
+     "username": "other"
+    },
+    "date": "2024-01-01T01:00:00+00:00"
+   },
+   "url": "https://t.me/testchat/18"
   },
   {
-   "id": 26,
-   "type": "message",
-   "date": "2024-01-02T02:00:00",
-   "from": "Pavel D",
-   "from_id": "user42",
-   "text": "message 26"
+   "id": "19",
+   "date": "2024-01-01T19:00:00+00:00",
+   "author": {
+    "id": "user42",
+    "name": "Pavel D"
+   },
+   "text": {
+    "plain": "forwarded from a person"
+   },
+   "forward": {
+    "from": {
+     "id": "user77",
+     "name": "Nikolai"
+    },
+    "date": "2024-01-01T02:00:00+00:00"
+   },
+   "url": "https://t.me/testchat/19"
   },
   {
-   "id": 27,
-   "type": "message",
-   "date": "2024-01-02T03:00:00",
-   "from": "Pavel D",
-   "from_id": "user42",
-   "text": "message 27"
+   "id": "20",
+   "date": "2024-01-01T20:00:00+00:00",
+   "author": {
+    "id": "user42",
+    "name": "Pavel D"
+   },
+   "text": {
+    "plain": "a reply"
+   },
+   "reply_to": "2",
+   "url": "https://t.me/testchat/20"
   },
   {
-   "id": 28,
-   "type": "message",
-   "date": "2024-01-02T04:00:00",
-   "from": "Pavel D",
-   "from_id": "user42",
-   "text": "message 28"
+   "id": "21",
+   "date": "2024-01-01T21:00:00+00:00",
+   "author": {
+    "id": "user42",
+    "name": "Pavel D"
+   },
+   "url": "https://t.me/testchat/21",
+   "media": [
+    {
+     "kind": "video",
+     "size": 524288000,
+     "mime": "video/mp4",
+     "width": 1920,
+     "height": 1080,
+     "duration": 600,
+     "path": "media/2024-01/21.mp4",
+     "state": "too_large",
+     "limit": 209715200
+    }
+   ]
   },
   {
-   "id": 29,
-   "type": "message",
-   "date": "2024-01-02T05:00:00",
-   "from": "Pavel D",
-   "from_id": "user42",
-   "text": "message 29"
+   "id": "22",
+   "date": "2024-01-01T22:00:00+00:00",
+   "author": {
+    "id": "channel5678",
+    "name": "Linked Channel"
+   },
+   "text": {
+    "plain": "posted as a channel"
+   },
+   "url": "https://t.me/testchat/22"
   },
   {
-   "id": 30,
-   "type": "message",
-   "date": "2024-01-02T06:00:00",
-   "from": "Pavel D",
-   "from_id": "user42",
-   "text": "message 30"
+   "id": "23",
+   "date": "2024-01-01T23:00:00+00:00",
+   "author": {
+    "id": "user43",
+    "name": "Solo"
+   },
+   "text": {
+    "plain": "no last name"
+   },
+   "url": "https://t.me/testchat/23"
+  },
+  {
+   "id": "24",
+   "date": "2024-01-02T00:00:00+00:00",
+   "author": {
+    "id": "user42",
+    "name": "Pavel D"
+   },
+   "text": {
+    "plain": "message 24"
+   },
+   "url": "https://t.me/testchat/24"
+  },
+  {
+   "id": "25",
+   "date": "2024-01-02T01:00:00+00:00",
+   "author": {
+    "id": "user42",
+    "name": "Pavel D"
+   },
+   "url": "https://t.me/testchat/25",
+   "media": [
+    {
+     "kind": "photo",
+     "size": 1025,
+     "width": 100,
+     "height": 100,
+     "path": "media/2024-01/25.jpg",
+     "state": "downloaded",
+     "thumbnail": "media/2024-01/25.thumb.jpg"
+    }
+   ]
+  },
+  {
+   "id": "26",
+   "date": "2024-01-02T02:00:00+00:00",
+   "author": {
+    "id": "user42",
+    "name": "Pavel D"
+   },
+   "text": {
+    "plain": "forwarded from someone who hides their account"
+   },
+   "forward": {
+    "from": {
+     "name": "Hidden Person"
+    },
+    "date": "2024-01-01T03:00:00+00:00"
+   },
+   "url": "https://t.me/testchat/26"
+  },
+  {
+   "id": "27",
+   "date": "2024-01-02T03:00:00+00:00",
+   "author": {
+    "id": "user42",
+    "name": "Pavel D"
+   },
+   "location": {
+    "latitude": 48.85,
+    "longitude": 2.29,
+    "name": "A tower",
+    "address": "1 Example Street"
+   },
+   "url": "https://t.me/testchat/27"
+  },
+  {
+   "id": "28",
+   "date": "2024-01-02T04:00:00+00:00",
+   "author": {
+    "id": "user42",
+    "name": "Pavel D"
+   },
+   "url": "https://t.me/testchat/28",
+   "extra": {
+    "telegram": {
+     "service": "pinned_message"
+    }
+   }
+  },
+  {
+   "id": "29",
+   "date": "2024-01-02T05:00:00+00:00",
+   "author": {
+    "id": "user42",
+    "name": "Pavel D"
+   },
+   "url": "https://t.me/testchat/29",
+   "media": [
+    {
+     "kind": "sticker",
+     "size": 329,
+     "mime": "application/x-tgsticker",
+     "width": 512,
+     "height": 512,
+     "emoji": "🎉",
+     "animated": "tgs",
+     "path": "media/2024-01/29.tgs",
+     "state": "downloaded",
+     "thumbnail": "media/2024-01/29.thumb.jpg"
+    }
+   ]
+  },
+  {
+   "id": "30",
+   "date": "2024-01-02T06:00:00+00:00",
+   "edited": "2024-01-02T16:00:00+00:00",
+   "author": {
+    "id": "user42",
+    "name": "Pavel D"
+   },
+   "text": {
+    "plain": "edited, and forwarded 5 times"
+   },
+   "url": "https://t.me/testchat/30"
   }
  ]
 }

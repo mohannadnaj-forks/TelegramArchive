@@ -4,14 +4,14 @@ import logging
 import os
 import time
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, tzinfo
 
 from pyrogram.errors import FileReferenceExpired, FloodWait
 from tqdm_loggable.auto import tqdm
 
-from . import file_status, records
+from . import __version__, records, states
 from .download import Downloader, LowDiskSpace
-from .media import MediaKind, find_media, media_fields, media_file_name, photo_size_id
+from .media import MediaKind, describe, file_name, find_media, media_path, photo_size_id, thumbnail_path
 from .settings import Settings, media_setting_name
 from .store import Archive, find_export_dir
 from .viewer import generate_index_html
@@ -20,16 +20,22 @@ logger = logging.getLogger(__name__)
 
 FILE_REFERENCE_CHUNK = 100
 FILE_REFERENCE_MAX_AGE = 1800
+ACCOUNT_PHOTO = 'account/photo.jpg'
 
 
 @dataclass(frozen=True)
 class RunOptions:
     output: str
-    since: datetime | None = None
-    until: datetime | None = None  # exclusive: the day after --until
+    since: datetime | None = None  # aware
+    until: datetime | None = None  # aware, exclusive: the day after --until
     max_file_size: int = 200 * 1024 ** 2
     max_total_size: int = 10 * 1024 ** 3
     refresh: bool = False
+    zone: tzinfo | None = None  # the zone dates are written in; None for the machine's
+
+    def describe(self) -> dict:
+        return {'since': self.since and self.since.isoformat(), 'until': self.until and self.until.isoformat(),
+                'max_file_size': self.max_file_size, 'max_total_size': self.max_total_size, 'refresh': self.refresh}
 
 
 class StopRequest:
@@ -66,14 +72,10 @@ def format_size(size: int) -> str:
         size /= 1024
 
 
-def now() -> str:
-    return datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
-
-
 class ChatExport:
-    # A run has two passes. Listing walks the history newest to oldest and writes each message's record,
+    # A run has two passes. Listing walks the history newest to oldest and writes each message's item,
     # marking wanted files 'pending'; the listed id ranges are kept in the archive so a stopped listing
-    # continues where it stopped. Downloading then fetches pending files by message id.
+    # continues where it stopped. Downloading then fetches the wanted files not on disk, by message id.
 
     def __init__(self, client, chat, cid, settings: Settings, options: RunOptions, stop: StopRequest,
                  downloader: Downloader | None = None, clock=time.time) -> None:
@@ -89,20 +91,28 @@ class ChatExport:
         # Messages already exported are kept, also ones since deleted or outside this run's date range.
         self.archive = Archive(find_export_dir(options.output, self.username, settings.resume_enabled))
         self.directory = self.archive.path
-        self.account = {**self.archive.get('account', {}), **records.chat_fields(chat)}
+        self.account = {**self.archive.get('account', {}), **records.account_fields(chat, saved=cid == 'me')}
+        if self.archive.get('created') is None:
+            self.archive.set('source', 'telegram')
+            self.archive.set('created', self.now())
+        self.archive.set('generator', f'telegram-archive {__version__}')
         self.existing = self.archive.count()
         self.listed = self.archive.get('extra', {}).get('telegram', {}).get('listed', [])
-        self.run_state = {'status': 'running', 'stage': 'listing', 'pid': os.getpid(), 'started': now()}
+        self.run_state = {'status': 'running', 'stage': 'listing', 'pid': os.getpid(), 'started': self.now(),
+                          'options': options.describe()}
         self.run_id = self.archive.start_run(self.run_state)
         self.written_at = clock()
         self.downloaded_total = 0
         self.left_out = 0
 
+    def now(self) -> str:
+        return datetime.now(self.options.zone).astimezone(self.options.zone).isoformat(timespec='seconds')
+
     def save(self, final: bool = False) -> None:
         """Commits what was written since the last save, at most every CHECKPOINT_SECONDS unless final."""
         if not final and self.clock() - self.written_at < self.settings.checkpoint_seconds:
             return
-        self.run_state['updated'] = now()
+        self.run_state['updated'] = self.now()
         self.archive.set('account', self.account)
         self.archive.set('extra', {'telegram': {'listed': self.listed}})
         self.archive.update_run(self.run_id, self.run_state)
@@ -119,7 +129,7 @@ class ChatExport:
             self.archive.close()
 
     async def export(self) -> bool:
-        await self.save_chat_photo()
+        await self.save_account_photo()
         if self.existing:
             print(f"📂 Continuing the existing export of @{self.username} ({self.existing:,} messages)")
         failure = None
@@ -142,15 +152,16 @@ class ChatExport:
             raise failure
         return complete
 
-    async def save_chat_photo(self) -> None:
-        path = os.path.join(self.directory, 'chat_photo.jpg')
+    async def save_account_photo(self) -> None:
+        path = self.full_path(ACCOUNT_PHOTO)
         if not os.path.exists(path) and getattr(self.chat, 'photo', None):
+            os.makedirs(os.path.dirname(path), exist_ok=True)
             try:
                 await self.client.download_media(self.chat.photo.big_file_id, path)
             except Exception as e:
                 logger.warning(f"⚠️ Could not download the chat photo: {e}")
         if os.path.exists(path):
-            self.account['photo'] = 'chat_photo.jpg'
+            self.account['photo'] = ACCOUNT_PHOTO
 
     async def list_messages(self) -> None:
         options = self.options
@@ -160,13 +171,14 @@ class ChatExport:
         except Exception:
             in_chat = None
         self.run_state.update(items_at_source=in_chat, listed=0)
+        if in_chat is not None:
+            self.account['counts'] = {'items': in_chat}
         known = f" ({in_chat:,} in the chat, {self.existing:,} in the export)" if in_chat is not None else ''
         if skip:
             print(f"📥 Listing messages of @{self.username} not listed before{known}; --refresh re-reads the whole history")
         else:
             print(f"📥 Listing messages of @{self.username}{known}")
         started = self.clock()
-        bar = tqdm(disable=True)
         bound, offset_date = 0, options.until
         while True:
             top, lowest, covered = bound or None, None, None
@@ -175,12 +187,12 @@ class ChatExport:
                     self.stop.check()
                     if bound and message.id > bound:
                         continue
-                    if options.since is not None and message.date is not None and message.date < options.since:
+                    if options.since is not None and message.date is not None and message.date.astimezone() < options.since:
                         return
                     covered = next((r for r in skip if r[0] <= message.id <= r[1]), None)
                     if covered:
                         break
-                    self.archive.put_item(await self.list_message(message, bar))
+                    self.archive.put_item(self.list_item(message), message.id)
                     top = top or message.id
                     lowest = message.id
                     self.cover(lowest, top)
@@ -219,69 +231,79 @@ class ChatExport:
             except FloodWait as e:
                 await self.wait_out(e)
 
-    async def list_message(self, message, pbar) -> dict:
-        record = records.message_fields(self.chat, message)
-        found = find_media(message)
-        if found:
-            await self.export_media(message, *found, record, pbar, download=False)
+    def full_path(self, path: str) -> str:
+        return os.path.join(self.directory, *path.split('/'))
+
+    def list_item(self, message) -> dict:
+        item = records.item_fields(self.chat, message, self.options.zone)
+        known = self.archive.media_of(item['id'])
+        medium = self.list_medium(message, item, known[0] if known else None)
+        if medium is not None:
+            item['media'] = [medium]
+        return item
+
+    def list_medium(self, message, item: dict, known: dict | None) -> dict | None:
+        """The message's medium as listing records it: on disk, left out by a setting, or pending."""
+        path = known.get('path') if known else None
         if message.contact is not None:
-            record['contact_information'] = records.contact_fields(message.contact)
-            if self.settings.media['contacts']:
-                name = f'contact_{message.id}.vcf'
-                os.makedirs(os.path.join(self.directory, 'contacts'), exist_ok=True)
-                with open(os.path.join(self.directory, 'contacts', name), 'w', encoding='utf-8') as f:
-                    f.write(records.vcard(message.contact))
-                record['contact_vcard'] = f'contacts/{name}'
-            else:
-                record['contact_vcard'] = file_status.FILE_NOT_FOUND
-        elif message.location is not None:
-            record['location_information'] = records.location_fields(message.location)
-        record.update(records.text_fields(message))
-        return record
-
-    async def export_media(self, message, kind: MediaKind, media, record: dict, pbar, download: bool) -> None:
-        """Fills in the record's media fields and file status, downloading the file when download is set."""
-        record.update(media_fields(kind, media))
-        options = self.options
-        size = getattr(media, 'file_size', None) or 0
-        name = media_file_name(message.id, media, kind.attr, kind.fallback_ext)
-        relative = f'{kind.folder}/{name}'
-        path = os.path.join(self.directory, kind.folder, name)
-        thumbs = getattr(media, 'thumbs', None)
-        thumb_path = f'{path}_thumb.jpg' if thumbs or kind.path_key == 'photo' else None
-
-        if os.path.exists(path):
-            status = file_status.downloaded(os.path.getsize(path))
+            medium = {'kind': 'contact', 'contact': records.contact_fields(message.contact),
+                      'path': path or media_path(item['date'][:7], f"{item['id']}.vcf")}
+            if not self.settings.media['contacts']:
+                states.set_state(medium, states.disabled(media_setting_name('contacts')))
+                return medium
+            full = self.full_path(medium['path'])
+            os.makedirs(os.path.dirname(full), exist_ok=True)
+            with open(full, 'w', encoding='utf-8') as f:
+                f.write(records.vcard(message.contact))
+            states.set_state(medium, states.downloaded())
+            return medium
+        found = find_media(message)
+        if not found:
+            return None
+        kind, media = found
+        medium = {**describe(kind, media), 'path': path or media_path(item['date'][:7], file_name(item['id'], media, kind))}
+        if os.path.exists(self.full_path(medium['path'])):
+            self.mark_downloaded(medium, item)
         else:
-            status = file_status.before_download(size, self.settings.media[kind.setting], media_setting_name(kind.setting),
-                                                 options.max_file_size)
-        if status is None and not download:
-            status = file_status.pending(size)
-        elif status is None and options.max_total_size and self.downloaded_total + size > options.max_total_size:
-            status = file_status.total_limit(size, options.max_total_size)
-            self.left_out += 1
-        elif status is None:
+            states.set_state(medium, states.before_download(medium.get('size') or 0, self.settings.media[kind.setting],
+                                                            media_setting_name(kind.setting), self.options.max_file_size)
+                             or states.pending())
+        return medium
+
+    def mark_downloaded(self, medium: dict, item: dict) -> None:
+        states.set_state(medium, states.downloaded())
+        if not medium.get('size'):
+            medium['size'] = os.path.getsize(self.full_path(medium['path']))
+        thumbnail = thumbnail_path(item['date'][:7], item['id'])
+        if os.path.exists(self.full_path(thumbnail)):
+            medium['thumbnail'] = thumbnail
+
+    async def download_medium(self, message, kind: MediaKind, media, item: dict, medium: dict, pbar) -> None:
+        """Downloads the file and its thumbnail, and records the outcome in medium."""
+        if not medium.get('path'):
+            medium['path'] = media_path(item['date'][:7], file_name(item['id'], media, kind))
+        path = self.full_path(medium['path'])
+        if not os.path.exists(path):
+            size = medium.get('size') or 0
+            if self.options.max_total_size and self.downloaded_total + size > self.options.max_total_size:
+                states.set_state(medium, states.total_limit(self.options.max_total_size))
+                self.left_out += 1
+                return
             os.makedirs(os.path.dirname(path), exist_ok=True)
-            pbar.set_postfix(file=name)
+            pbar.set_postfix(file=os.path.basename(path))
             ok, error = await self.fetch(message, media, path, pbar)
             pbar.set_postfix(file=None)
-            status = file_status.downloaded(os.path.getsize(path)) if ok else file_status.failed(error)
-            if ok:
-                self.downloaded_total += status['size']
-
-        file_status.set_status(record, kind.path_key, status, relative)
-        downloaded = status['state'] == 'downloaded'
-        if thumb_path is not None:
-            if downloaded and not os.path.exists(thumb_path):
-                thumb_id = thumbs[0].file_id if kind.path_key == 'file' else photo_size_id(media.file_id, 'm')
-                with contextlib.suppress(FileReferenceExpired):
-                    await self.downloader.fetch(thumb_id, thumb_path, pbar)
-            if os.path.exists(thumb_path):
-                record['thumbnail'] = f'{relative}_thumb.jpg'
-            elif kind.path_key == 'file':
-                record['thumbnail'] = record['file']
-        elif kind.path_key == 'file' and kind.media_type != 'voice_message':
-            record['thumbnail'] = record['file']
+            if not ok:
+                states.set_state(medium, states.failed(error))
+                return
+            self.downloaded_total += size or os.path.getsize(path)
+        thumbnail = self.full_path(thumbnail_path(item['date'][:7], item['id']))
+        thumbs = getattr(media, 'thumbs', None)
+        if not os.path.exists(thumbnail) and (thumbs or kind.kind == 'photo'):
+            thumb_id = photo_size_id(media.file_id, 'm') if kind.kind == 'photo' else thumbs[0].file_id
+            with contextlib.suppress(FileReferenceExpired):
+                await self.downloader.fetch(thumb_id, thumbnail, pbar)
+        self.mark_downloaded(medium, item)
 
     async def fetch(self, message, media, path: str, pbar) -> tuple[bool, str | None]:
         """Downloads the file; when its reference has expired, fetches the message again, once."""
@@ -298,28 +320,27 @@ class ChatExport:
         except FileReferenceExpired as e:
             return False, str(e)
 
-    def wanted(self, record: dict) -> bool:
-        return file_status.is_wanted(record, self.settings.media, self.options.max_file_size,
-                                     self.options.since, self.options.until)
+    def wanted(self, medium: dict, date: str) -> bool:
+        return states.is_wanted(medium, date, self.settings.media, self.options.max_file_size,
+                                self.options.since, self.options.until)
 
     async def download_media(self) -> None:
         options = self.options
         self.downloaded_total = self.archive.downloaded_bytes()
         planned, left_out, planned_bytes = [], [], self.downloaded_total
-        for record in self.archive.items(newest_first=True, with_files_not_downloaded=True):
-            if not self.wanted(record):
+        for item_id, position, date, medium in self.archive.media_not_downloaded():
+            if not self.wanted(medium, date):
                 continue
-            size = record['file_status'].get('size') or 0
+            size = medium.get('size') or 0
             if options.max_total_size and planned_bytes + size > options.max_total_size:
-                left_out.append((record['id'], size))
+                left_out.append((item_id, position, medium))
                 continue
-            planned.append(record['id'])
+            planned.append(int(item_id))
             planned_bytes += size
         self.left_out = len(left_out)
-        for message_id, size in left_out:
-            record = self.archive.item(message_id)
-            file_status.set_status(record, file_status.path_key(record), file_status.total_limit(size, options.max_total_size))
-            self.archive.put_item(record)
+        for item_id, position, medium in left_out:
+            states.set_state(medium, states.total_limit(options.max_total_size))
+            self.archive.set_medium(item_id, position, medium)
         if not planned:
             return
         free = self.downloader.free_bytes(self.directory)
@@ -338,20 +359,25 @@ class ChatExport:
                         fresh = await self.get_messages(chunk[position:])
                         messages = {m.id: m for m in fresh if m is not None and not m.empty}
                         fetched_at = self.clock()
-                    message = messages.get(message_id)
-                    found = find_media(message) if message is not None else None
-                    if found:
-                        record = self.archive.item(message_id)
-                        await self.export_media(message, *found, record, pbar, download=True)
-                        self.archive.put_item(record)
+                    await self.download_item(messages.get(message_id), str(message_id), pbar)
                     pbar.update(1)
                     self.save()
         finally:
             pbar.close()
 
+    async def download_item(self, message, item_id: str, pbar) -> None:
+        item = self.archive.item(item_id)
+        [medium] = item['media']
+        found = find_media(message) if message is not None else None
+        if found is None:
+            states.set_state(medium, states.unavailable('message no longer available'))
+        else:
+            await self.download_medium(message, *found, item, medium, pbar)
+        self.archive.set_medium(item_id, 0, medium)
+
     def report(self) -> None:
-        states = self.archive.file_states()
-        summary = ', '.join(f"{v['count']} {state.replace('_', ' ')}" for state, v in sorted(states.items()))
+        file_states = self.archive.file_states()
+        summary = ', '.join(f"{v['count']} {state.replace('_', ' ')}" for state, v in sorted(file_states.items()))
         run = self.run_state
         in_chat = run.get('items_at_source')
         count = self.archive.count()
@@ -368,7 +394,7 @@ class ChatExport:
         print(f"✅ Export of @{self.username} is up to date: {count:,} messages, media {format_size(total)} ({summary})")
         if self.left_out:
             print(f"💡 {self.left_out} files were left out by --max-total-size ({format_size(self.options.max_total_size)}); run again with a larger value to fetch them.")
-        missing = sum(v['bytes'] for state, v in states.items() if state in ('total_limit', 'too_large'))
+        missing = sum(v['bytes'] for state, v in file_states.items() if state in ('total_limit', 'too_large'))
         if missing:
             print(f"📦 A complete export needs about {format_size(total + missing)} "
                   f"({format_size(missing)} not downloaded yet, thumbnails not counted).")

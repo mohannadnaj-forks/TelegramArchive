@@ -8,12 +8,12 @@ import unittest
 
 from tests.support import ExportRun
 
-VIDEO = 'video_250.mp4'  # the newest file of the basic chat, downloaded first
+VIDEO = '250.mp4'  # the newest file of the basic chat, downloaded first
 
 
 class DownloadRetries(ExportRun):
     def status_of(self, message_id: int) -> dict:
-        return self.records()[message_id]['file_status']
+        return {k: v for k, v in self.medium(message_id).items() if k in ('state', 'error', 'limit', 'setting')}
 
     def test_a_flood_wait_is_waited_out_and_the_download_retried(self):
         self.assertEqual(self.run_bot(download_errors={VIDEO: ['flood:30']}), 0, self.output)
@@ -40,7 +40,7 @@ class DownloadRetries(ExportRun):
         self.assertEqual(self.run_bot(download_errors={VIDEO: ['network'] * 5}), 0, self.output)
         self.assertEqual(self.status_of(250), {'state': 'failed', 'error': 'network went away'})
         self.assertEqual(self.sleeps(), [2, 4, 8, 16])
-        self.assertEqual(self.records()[250]['file'], '(File not included. Download failed; run again to retry.)')
+        self.assertEqual(self.medium(250)['path'], 'media/2024-01/250.mp4', 'the path stays where the file will go')
 
     def test_an_error_that_clears_up_costs_one_wait(self):
         self.assertEqual(self.run_bot(download_errors={VIDEO: ['network']}), 0, self.output)
@@ -51,8 +51,8 @@ class DownloadRetries(ExportRun):
         self.assertEqual(self.run_bot(download_errors={VIDEO: ['zero'] * 5}), 0, self.output)
         self.assertEqual(self.status_of(250), {'state': 'failed', 'error': 'zero bytes written'})
         self.assertEqual(self.sleeps(), [2, 120, 8, 120])
-        self.assertFalse(os.path.exists(self.path('video_files', VIDEO)))
-        self.assertFalse(os.path.exists(self.path('video_files', VIDEO + '.tmp')))
+        self.assertFalse(os.path.exists(self.path('media', '2024-01', VIDEO)))
+        self.assertFalse(os.path.exists(self.path('media', '2024-01', VIDEO + '.tmp')))
 
     def test_an_expired_file_reference_is_renewed_by_fetching_the_message_again(self):
         self.assertEqual(self.run_bot(expired_references=[250]), 0, self.output)
@@ -102,7 +102,7 @@ class FailuresOutsideDownloads(ExportRun):
         self.assertEqual(self.run_bot(history_errors={'50': 'flood:30'}), 0, self.output)
         self.assertEqual(self.sleeps(), [30])
         self.assertEqual(self.listed_ids(), list(range(250, 201, -1)) + list(range(201, 0, -1)))
-        self.assertEqual(len(self.result()['messages']), 250)
+        self.assertEqual(len(self.item_ids()), 250)
         self.assertEqual(self.state()['listed'], [[1, 250]])
 
     def test_a_flood_wait_while_fetching_for_downloads_is_waited_out(self):
@@ -113,11 +113,11 @@ class FailuresOutsideDownloads(ExportRun):
     def test_a_flood_wait_while_listing_longer_than_the_maximum_stops_the_run_with_the_listing_kept(self):
         self.assertNotEqual(self.run_bot(history_errors={'50': 'flood:30'}, env={'FLOOD_WAIT_MAX_SLEEP': 10}), 0)
         self.assertIn('FLOOD_WAIT', self.output)
-        self.assertEqual(len(self.result()['messages']), 49)
+        self.assertEqual(len(self.item_ids()), 49)
         self.assertEqual(self.state()['run']['status'], 'failed')
         self.assertEqual(self.run_bot(), 0, self.output)
         self.assertNotIn(240, self.listed_ids())
-        self.assertEqual(len(self.result()['messages']), 250)
+        self.assertEqual(len(self.item_ids()), 250)
 
     def test_an_error_fetching_messages_for_downloads_stops_the_run_with_the_listing_kept(self):
         self.assertNotEqual(self.run_bot(get_messages_error='network'), 0)
@@ -126,12 +126,14 @@ class FailuresOutsideDownloads(ExportRun):
         self.assertEqual(self.run_bot(), 0, self.output)
         self.assertEqual(self.file_states(), {'downloaded': 117})
 
-    def test_a_message_deleted_after_it_was_listed_stays_pending(self):
+    def test_a_message_deleted_after_it_was_listed_is_kept_and_its_file_is_not_asked_for_again(self):
         self.assertEqual(self.run_bot(deleted_after_listing=[249]), 0, self.output)
-        self.assertEqual(self.records()[249]['file_status']['state'], 'pending')
+        self.assertEqual(self.medium(249)['state'], 'unavailable')
+        self.assertEqual(self.medium(249)['error'], 'message no longer available')
+        self.assertIn(249, self.item_ids())
         self.assertEqual(self.state()['run']['status'], 'complete')
         self.assertEqual(self.run_bot(deleted_after_listing=[249]), 0, self.output)
-        self.assertEqual(self.calls('get_messages'), [{'call': 'get_messages', 'ids': [249]}])
+        self.assertEqual(self.calls('get_messages'), [])
 
 
 if __name__ == '__main__':

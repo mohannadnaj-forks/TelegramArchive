@@ -8,7 +8,7 @@ import re
 import signal
 import sys
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, tzinfo
 from typing import Mapping
 
 from dotenv import load_dotenv
@@ -36,6 +36,12 @@ def parse_date(value: str) -> datetime:
         return datetime.strptime(value, '%Y-%m-%d')
     except ValueError:
         raise argparse.ArgumentTypeError(f"'{value}' is not a date; use YYYY-MM-DD")
+
+
+def day_start(day: datetime | None, zone: tzinfo | None) -> datetime | None:
+    if day is None:
+        return None
+    return day.replace(tzinfo=zone) if zone else day.astimezone()
 
 
 def parse_chat(value: str):
@@ -123,7 +129,7 @@ async def export_chats(client, chats: list, export_all: bool, settings: Settings
 
 
 def run(argv: list, env: Mapping[str, str], client_factory=create_client, session_dir: str = SESSION_DIR,
-        sleep=asyncio.sleep, free_bytes=None, clock=time.time) -> None:
+        sleep=asyncio.sleep, free_bytes=None, clock=time.time, zone: tzinfo | None = None) -> None:
     """Runs the command line against env; the other arguments are for tests."""
     settings = Settings.from_env(env)
     parser = build_parser(settings.download_path)
@@ -137,11 +143,12 @@ def run(argv: list, env: Mapping[str, str], client_factory=create_client, sessio
 
     options = RunOptions(
         output=os.path.abspath(os.path.expanduser(args.output)),
-        since=args.since,
-        until=args.until + timedelta(days=1) if args.until else None,
+        since=day_start(args.since, zone),
+        until=day_start(args.until + timedelta(days=1), zone) if args.until else None,
         max_file_size=args.max_file_size,
         max_total_size=args.max_total_size,
         refresh=args.refresh,
+        zone=zone,
     )
     if args.viewer_only:
         rebuild_viewers(args.chats, options.output, settings.resume_enabled)

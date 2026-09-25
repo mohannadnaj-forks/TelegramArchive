@@ -49,9 +49,12 @@ class Saving(unittest.TestCase):
         self.archive = Archive(self.dir)
         return self.archive
 
-    def record(self, i, state=None, size=None, **fields):
-        status = {'file_status': {'state': state, 'size': size}} if state else {}
-        return {'id': i, 'date': '2024-01-02T10:00:00', **status, **fields}
+    def item(self, i, state=None, size=None, **fields):
+        media = {'media': [{'kind': 'photo', 'state': state, **({'size': size} if size else {})}]} if state else {}
+        return {'id': str(i), 'date': '2024-01-02T10:00:00+00:00', **media, **fields}
+
+    def put(self, i, *args, **fields):
+        self.archive.put_item(self.item(i, *args, **fields), i)
 
     def test_a_new_archive_says_what_it_is(self):
         self.assertTrue(is_export_dir(self.dir))
@@ -59,29 +62,35 @@ class Saving(unittest.TestCase):
         self.assertEqual(self.archive.count(), 0)
 
     def test_only_committed_changes_are_kept(self):
-        self.archive.put_item(self.record(1))
+        self.put(1)
         self.archive.commit()
-        self.archive.put_item(self.record(2))
-        self.assertEqual([r['id'] for r in self.reopen().items()], [1])
+        self.put(2)
+        self.assertEqual([r['id'] for r in self.reopen().items()], ['1'])
 
-    def test_items_are_replaced_by_id_and_read_in_id_order(self):
+    def test_items_are_replaced_by_id_and_read_in_sort_order_with_their_media(self):
         for i in (9, 7, 2):
-            self.archive.put_item(self.record(i))
-        self.archive.put_item(self.record(7, text='edited'))
-        self.assertEqual([r['id'] for r in self.archive.items()], [2, 7, 9])
-        self.assertEqual([r['id'] for r in self.archive.items(newest_first=True)], [9, 7, 2])
-        self.assertEqual(self.archive.item(7)['text'], 'edited')
-        self.assertIsNone(self.archive.item(8))
+            self.put(i, 'pending', 5)
+        self.put(7, text={'plain': 'edited'})
+        self.assertEqual([r['id'] for r in self.archive.items()], ['2', '7', '9'])
+        self.assertEqual([r['id'] for r in self.archive.items(newest_first=True)], ['9', '7', '2'])
+        self.assertEqual(self.archive.item('7'), self.item(7, text={'plain': 'edited'}))
+        self.assertEqual(self.archive.item('9'), self.item(9, 'pending', 5))
+        self.assertEqual(self.archive.media_of('7'), [])
+        self.assertIsNone(self.archive.item('8'))
 
     def test_files_are_counted_by_state(self):
-        self.archive.put_item(self.record(1, 'downloaded', 10))
-        self.archive.put_item(self.record(2, 'downloaded', 5))
-        self.archive.put_item(self.record(3, 'pending', 7))
-        self.archive.put_item(self.record(4))
+        self.put(1, 'downloaded', 10)
+        self.put(2, 'downloaded', 5)
+        self.put(3, 'pending', 7)
+        self.put(4)
+        self.put(5, 'failed')
         self.assertEqual(self.archive.file_states(), {'downloaded': {'count': 2, 'bytes': 15},
-                                                      'pending': {'count': 1, 'bytes': 7}})
+                                                      'pending': {'count': 1, 'bytes': 7},
+                                                      'failed': {'count': 1, 'bytes': 0}})
         self.assertEqual(self.archive.downloaded_bytes(), 15)
-        self.assertEqual([r['id'] for r in self.archive.items(with_files_not_downloaded=True)], [3])
+        self.assertEqual([(i, p) for i, p, date, m in self.archive.media_not_downloaded()], [('5', 0), ('3', 0)])
+        self.archive.set_medium('3', 0, {'kind': 'photo', 'state': 'downloaded', 'size': 7})
+        self.assertEqual(self.archive.downloaded_bytes(), 22)
 
     def test_values_and_runs(self):
         self.archive.set('account', {'name': 'Test'})

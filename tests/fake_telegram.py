@@ -15,10 +15,10 @@ inclusive, offset_date returning messages older than it.
 import json
 import os
 import signal
-from datetime import datetime, timedelta
+from datetime import datetime, timezone
 from types import SimpleNamespace
 
-BASE_DATE = datetime(2024, 1, 1)
+BASE_TIME = datetime(2024, 1, 1, tzinfo=timezone.utc).timestamp()
 PAGE = 100
 CHAT_ID = -1001234
 MEDIA_ATTRS = ('photo', 'video', 'animation', 'sticker', 'video_note', 'audio', 'voice', 'document')
@@ -26,7 +26,8 @@ RICH_COUNT = 30
 
 
 def date_of(i: int) -> datetime:
-    return BASE_DATE + timedelta(hours=i)
+    # Naive local time, as Kurigram gives it; message i is i hours after 2024-01-01 00:00 UTC.
+    return datetime.fromtimestamp(BASE_TIME + 3600 * i)
 
 
 def photo_file_id(i: int, size: str = 'y') -> str:
@@ -69,9 +70,9 @@ def base_message(i: int, chat_type: str) -> SimpleNamespace:
         id=i, date=date_of(i), empty=False,
         sender_chat=SimpleNamespace(id=CHAT_ID, title='Test') if chat_type == 'channel' else None,
         from_user=None if chat_type == 'channel' else SimpleNamespace(id=42, first_name='Pavel', last_name='D'),
-        reply_to_message_id=None, media_group_id=None, views=1 if chat_type == 'channel' else None,
-        forward_from_chat=None, forward_from=None, contact=None, location=None,
-        text=None, caption=None, caption_entities=None,
+        reply_to_message_id=None, media_group_id=None, views=1 if chat_type == 'channel' else None, forwards=None,
+        forward_origin=None, contact=None, location=None, venue=None, service=None, edit_date=None,
+        author_signature=None, text=None, caption=None, caption_entities=None,
     )
     for attr in MEDIA_ATTRS:
         setattr(message, attr, None)
@@ -144,10 +145,12 @@ def rich_message(i: int, chat_type: str = 'channel') -> SimpleNamespace:
         m.location = SimpleNamespace(latitude=51.5, longitude=-0.12)
     elif i == 18:
         m.text = text('forwarded from a channel')
-        m.forward_from_chat = SimpleNamespace(title='Other Channel')
+        m.forward_origin = SimpleNamespace(chat=SimpleNamespace(id=-1009999, title='Other Channel', username='other'),
+                                           date=date_of(1))
     elif i == 19:
         m.text = text('forwarded from a person')
-        m.forward_from = SimpleNamespace(first_name='Nikolai')
+        m.forward_origin = SimpleNamespace(sender_user=SimpleNamespace(id=77, first_name='Nikolai', last_name=None),
+                                           date=date_of(2))
     elif i == 20:
         m.text = text('a reply')
         m.reply_to_message_id = 2
@@ -166,9 +169,27 @@ def rich_message(i: int, chat_type: str = 'channel') -> SimpleNamespace:
         # A channel post signed with the author's profile: Kurigram sets from_user, not sender_chat.
         m.sender_chat = None
         m.from_user = SimpleNamespace(id=44, first_name='Author', last_name=None)
+        m.author_signature = 'Author'
         m.text = text('signed post')
     elif i == 25:
         m.photo = SimpleNamespace(file_id=photo_file_id(i), file_size=1000 + i, width=100, height=100, thumbs=None)
+    elif i == 26:
+        m.text = text('forwarded from someone who hides their account')
+        m.forward_origin = SimpleNamespace(sender_user_name='Hidden Person', date=date_of(3))
+    elif i == 27:
+        m.venue = SimpleNamespace(location=SimpleNamespace(latitude=48.85, longitude=2.29), title='A tower',
+                                  address='1 Example Street')
+        m.location = m.venue.location
+    elif i == 28:
+        from pyrogram.enums import MessageServiceType
+        m.service = MessageServiceType.PINNED_MESSAGE
+    elif i == 29:
+        m.sticker = media('sticker', i, mime_type='application/x-tgsticker', emoji='🎉', width=512, height=512,
+                          is_animated=True, is_video=False, thumbs=thumbs(f'sticker:{i}'))
+    elif i == 30:
+        m.text = text('edited, and forwarded 5 times')
+        m.edit_date = date_of(40)
+        m.forwards = 5 if chat_type == 'channel' else None
     else:
         m.text = text(f'message {i}')
     return m
@@ -189,6 +210,8 @@ def make_chat(scenario: dict, chat_id=None):
         chat.description = scenario['description']
     if 'username' in scenario:
         chat.username = scenario['username']
+    if 'chat_id' in scenario:
+        chat.id = scenario['chat_id']
     if scenario.get('chat_photo'):
         chat.photo = SimpleNamespace(big_file_id='chatphoto:0')
     return chat
@@ -258,7 +281,7 @@ def make_fake_client(scenario: dict, kill=lambda: os._exit(9)) -> type:
         async def get_chat_history(self, chat_id, limit=0, offset=0, offset_id=None, offset_date=None,
                                    min_id=0, max_id=0, reverse=False):
             selected = [i for i in reversed(ids)
-                        if (not max_id or i <= max_id) and (offset_date is None or date_of(i) < offset_date)]
+                        if (not max_id or i <= max_id) and (offset_date is None or date_of(i).timestamp() < offset_date.timestamp())]
             for start in range(0, len(selected), PAGE):
                 page = selected[start:start + PAGE]
                 log({'call': 'history', 'max_id': max_id, 'page': [page[0], page[-1]]})

@@ -1,6 +1,5 @@
-"""Kurigram chats and messages -> the fields of result.json. No input or output here."""
-import time
-from datetime import datetime
+"""Kurigram chats and messages -> the account and item shapes of docs/export-format.md. No input or output here."""
+from datetime import datetime, tzinfo
 
 from pyrogram.enums import ChatType, MessageEntityType
 
@@ -25,116 +24,157 @@ ENTITY_TYPES = {
     MessageEntityType.BANK_CARD: 'bank_card',
     MessageEntityType.CUSTOM_EMOJI: 'custom_emoji',
 }
-CHAT_TYPES = {
-    ChatType.PRIVATE: 'personal_chat',
-    ChatType.CHANNEL: 'public_channel',
-    ChatType.GROUP: 'public_group',
-    ChatType.SUPERGROUP: 'public_supergroup',
+ACCOUNT_KINDS = {
+    ChatType.PRIVATE: 'private',
+    ChatType.BOT: 'bot',
+    ChatType.CHANNEL: 'channel',
+    ChatType.GROUP: 'group',
+    ChatType.SUPERGROUP: 'group',
 }
 
 
-def without_api_prefix(chat_id) -> str:
-    # The API gives channels and supergroups ids with a -100 prefix; exports record them without it.
-    return str(chat_id).removeprefix('-100')
+def instant(date: datetime, zone: tzinfo | None = None) -> str:
+    """ISO 8601 with the UTC offset. Kurigram's dates are naive local time (with fold set for the repeated hour)."""
+    return date.astimezone(zone).isoformat(timespec='seconds')
 
 
-def chat_fields(chat) -> dict:
-    fields = {}
+def peer_id(peer_id: int) -> str:
+    """A Telegram id with its kind: user42, channel1234 (channels and supergroups, without -100), chat555 (basic groups)."""
+    text = str(peer_id)
+    if text.startswith('-100'):
+        return f'channel{text[4:]}'
+    if text.startswith('-'):
+        return f'chat{text[1:]}'
+    return f'user{text}'
+
+
+def full_name(person) -> str:
+    return ' '.join(filter(None, (getattr(person, 'first_name', None), getattr(person, 'last_name', None))))
+
+
+def author_of(peer) -> dict:
+    """A user or a chat as an item's author."""
+    author = {'id': peer_id(peer.id), 'name': getattr(peer, 'title', None) or full_name(peer) or peer_id(peer.id)}
+    if getattr(peer, 'username', None):
+        author['username'] = peer.username
+    return author
+
+
+def account_fields(chat, saved: bool = False) -> dict:
+    kind = 'saved' if saved else ACCOUNT_KINDS.get(chat.type, 'private')
+    account = {'id': peer_id(chat.id), 'kind': kind, 'public': bool(chat.username),
+               'name': chat.title or full_name(chat) or (f'@{chat.username}' if chat.username else peer_id(chat.id))}
     if chat.username:
-        fields['username'] = chat.username
+        account['username'] = chat.username
+        account['url'] = f'https://t.me/{chat.username}'
     description = getattr(chat, 'description', None) or getattr(chat, 'bio', None)
     if description:
-        fields['description'] = description
-    # TODO: the last name of private chats; private groups and channels are typed as public ones; chats with bots get none of these.
-    if chat.type == ChatType.PRIVATE:
-        fields.update(name=chat.first_name, type='personal_chat', id=chat.id)
-    elif chat.type in CHAT_TYPES:
-        chat_id = str(chat.id)[4:] if str(chat.id).startswith('-100') else chat.id
-        fields.update(name=chat.title, type=CHAT_TYPES[chat.type], id=chat_id)
+        account['description'] = description
+    return account
+
+
+def text_of(value, message_entities) -> dict:
+    """Text with entities at Telegram's offsets; value is Kurigram's Str, which slices in UTF-16 code units."""
+    text = {'plain': str(value)}
+    found = []
+    for e in message_entities or ():
+        entity = {'type': ENTITY_TYPES.get(e.type, 'unknown'), 'offset': e.offset, 'length': e.length}
+        if e.type == MessageEntityType.TEXT_LINK:
+            entity['url'] = e.url
+        elif e.type == MessageEntityType.PRE and getattr(e, 'language', None):
+            entity['language'] = e.language
+        elif e.type == MessageEntityType.TEXT_MENTION and getattr(e, 'user', None) is not None:
+            entity['user_id'] = peer_id(e.user.id)
+        found.append(entity)
+    if found:
+        text['entities'] = found
+    return text
+
+
+def forward_of(message, zone) -> dict | None:
+    origin = getattr(message, 'forward_origin', None)
+    if origin is None:
+        return None
+    peer = getattr(origin, 'sender_user', None) or getattr(origin, 'sender_chat', None) or getattr(origin, 'chat', None)
+    if peer is not None:
+        source = author_of(peer)
+    elif getattr(origin, 'sender_user_name', None):
+        source = {'name': origin.sender_user_name}
+    else:
+        return None
+    forward = {'from': source}
+    if getattr(origin, 'date', None):
+        forward['date'] = instant(origin.date, zone)
+    return forward
+
+
+def location_of(message) -> dict | None:
+    venue = getattr(message, 'venue', None)
+    location = venue.location if venue is not None else message.location
+    if location is None:
+        return None
+    fields = {'latitude': location.latitude, 'longitude': location.longitude}
+    if venue is not None:
+        fields.update({k: v for k, v in (('name', venue.title), ('address', venue.address)) if v})
     return fields
 
 
-def unixtime(date: datetime) -> int:
-    # Kurigram's dates are naive local time.
-    return int(time.mktime(date.timetuple()))
-
-
-def message_fields(chat, message) -> dict:
-    """The fields every record starts with, up to and including forwarded_from."""
-    record = {
-        'id': message.id,
-        'type': 'message',
-        'date': message.date.strftime('%Y-%m-%dT%H:%M:%S'),
-        'date_unixtime': unixtime(message.date),
-    }
-    if chat.type == ChatType.CHANNEL:
-        record['from'] = chat.title
-        record['from_id'] = f'channel{without_api_prefix(chat.id)}'
-    elif message.from_user is not None:
-        record['from'] = ' '.join(filter(None, (message.from_user.first_name, message.from_user.last_name)))
-        record['from_id'] = f'user{message.from_user.id}'
-    elif message.sender_chat is not None:
-        # Anonymous group admins and channels posting into a group.
-        record['from'] = message.sender_chat.title
-        record['from_id'] = f'channel{without_api_prefix(message.sender_chat.id)}'
-    else:
-        record['from'] = chat.title or chat.first_name
-
-    if message.reply_to_message_id is not None:
-        record['reply_to_message_id'] = message.reply_to_message_id
+def item_fields(chat, message, zone: tzinfo | None = None) -> dict:
+    """The item for a message, without its media."""
+    item = {'id': str(message.id), 'date': instant(message.date, zone)}
+    if getattr(message, 'edit_date', None):
+        item['edited'] = instant(message.edit_date, zone)
+    if message.from_user is not None:
+        item['author'] = author_of(message.from_user)
+    elif message.sender_chat is not None and message.sender_chat.id != chat.id:
+        item['author'] = author_of(message.sender_chat)
+    if message.text is not None:
+        item['text'] = text_of(message.text, message.text.entities)
+    elif message.caption:
+        item['text'] = text_of(message.caption, message.caption_entities)
     if message.media_group_id is not None:
-        record['media_group_id'] = str(message.media_group_id)
-    if message.views is not None:
-        record['views'] = message.views
-    if message.forward_from_chat is not None:
-        record['forwarded_from'] = message.forward_from_chat.title
-    elif message.forward_from is not None:
-        record['forwarded_from'] = message.forward_from.first_name
-    return record
+        item['group'] = str(message.media_group_id)
+    if message.reply_to_message_id is not None:
+        item['reply_to'] = str(message.reply_to_message_id)
+    forward = forward_of(message, zone)
+    if forward:
+        item['forward'] = forward
+    counts = {k: v for k, v in (('views', message.views), ('forwards', getattr(message, 'forwards', None))) if v is not None}
+    if counts:
+        item['counts'] = counts
+    location = location_of(message)
+    if location:
+        item['location'] = location
+    if chat.username and chat.type in (ChatType.CHANNEL, ChatType.SUPERGROUP):
+        item['url'] = f'https://t.me/{chat.username}/{message.id}'
+    extra = {}
+    if getattr(message, 'service', None) is not None:
+        extra['service'] = message.service.name.lower()
+    if getattr(message, 'author_signature', None):
+        extra['signature'] = message.author_signature
+    if extra:
+        item['extra'] = {'telegram': extra}
+    return item
 
 
 def contact_fields(contact) -> dict:
-    return {'phone_number': contact.phone_number, 'fist_name': contact.first_name or '', 'last_name': contact.last_name or ''}
+    fields = {'phone': contact.phone_number, 'first_name': contact.first_name or ''}
+    if contact.last_name:
+        fields['last_name'] = contact.last_name
+    return fields
+
+
+def vcard_escape(value: str) -> str:
+    return value.replace('\\', '\\\\').replace(';', '\\;').replace(',', '\\,').replace('\r\n', '\\n').replace('\n', '\\n')
 
 
 def vcard(contact) -> str:
-    first, last = contact.first_name or '', contact.last_name or ''
+    first, last = vcard_escape(contact.first_name or ''), vcard_escape(contact.last_name or '')
     return (
         'BEGIN:VCARD\n'
         'VERSION:3.0\n'
         f'FN;CHARSET=UTF-8:{" ".join(filter(None, (first, last)))}\n'
         f'N;CHARSET=UTF-8:{last};{first};;;\n'
-        f'TEL;TYPE=CELL:{contact.phone_number}\n'
+        f'TEL;TYPE=CELL:{vcard_escape(contact.phone_number or "")}\n'
         'END:VCARD\n'
     )
-
-
-def location_fields(location) -> dict:
-    return {'latitude': location.latitude, 'longitude': location.longitude}
-
-
-def entities(text, message_entities) -> list:
-    """Entities as result.json records them; text is Kurigram's Str, which slices in UTF-16 code units like Telegram."""
-    found = []
-    for e in message_entities or ():
-        entity = {'type': ENTITY_TYPES.get(e.type, 'unknown')}
-        if e.type == MessageEntityType.PRE:
-            entity['language'] = ''
-        elif e.type == MessageEntityType.TEXT_LINK:
-            entity['href'] = e.url
-        entity['text'] = text[e.offset:e.offset + e.length]
-        entity['offset'] = e.offset
-        entity['length'] = e.length
-        found.append(entity)
-    return found
-
-
-def text_fields(message) -> dict:
-    """'text' or 'caption': a plain string, or entities followed by the string."""
-    if message.text is not None:
-        found = entities(message.text, message.text.entities)
-        return {'text': [*found, message.text] if found else message.text}
-    if message.caption is not None:
-        found = entities(message.caption, message.caption_entities)
-        return {'caption': [*found, message.caption] if found else message.caption}
-    return {'text': ''}

@@ -13,7 +13,7 @@ class EndToEnd(SubprocessRun):
     def test_ctrl_c_during_listing_keeps_what_was_listed(self):
         self.assertEqual(self.run_bot(count=350, interrupt_after_listed=120), 0, self.output)
         self.assertIn('Stopping after the current message', self.output)
-        self.assertEqual([m['id'] for m in self.result()['messages']], list(range(231, 351)))
+        self.assertEqual(self.item_ids(), list(range(231, 351)))
         self.assertEqual(self.state()['run']['status'], 'stopped')
         self.assertEqual(self.run_bot(count=350), 0, self.output)
         self.assertEqual(self.state()['listed'], [[1, 350]])
@@ -28,10 +28,10 @@ class EndToEnd(SubprocessRun):
 
     def test_a_killed_run_keeps_what_it_saved(self):
         self.assertEqual(self.run_bot(checkpoint_seconds=0, kill_after_listed=120), 9)
-        self.assertEqual(len(self.result()['messages']), 120)
+        self.assertEqual(len(self.item_ids()), 120)
         self.assertEqual(self.state()['run']['status'], 'running')
         self.assertEqual(self.run_bot(), 0, self.output)
-        self.assertEqual([m['id'] for m in self.result()['messages']], list(range(1, 251)))
+        self.assertEqual(self.item_ids(), list(range(1, 251)))
 
     def test_the_viewer_is_rebuilt_from_the_command_line(self):
         self.run_bot(count=30)

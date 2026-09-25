@@ -17,6 +17,7 @@ import sys
 import tempfile
 import traceback
 import unittest
+from datetime import timezone
 from contextlib import redirect_stderr, redirect_stdout
 
 from telegram_archive import cli
@@ -102,12 +103,15 @@ class ExportChecks:
         finally:
             archive.close()
 
-    def result(self) -> dict:
-        archive = self.archive()
-        return {**archive['account'], 'messages': archive['items']}
+    def items(self) -> dict:
+        return {int(item['id']): item for item in self.archive()['items']}
 
-    def records(self) -> dict:
-        return {m['id']: m for m in self.result()['messages']}
+    def item_ids(self) -> list:
+        return [int(item['id']) for item in self.archive()['items']]
+
+    def medium(self, item_id: int) -> dict:
+        [medium] = self.items()[item_id]['media']
+        return medium
 
     def state(self) -> dict:
         archive = self.archive()
@@ -117,16 +121,16 @@ class ExportChecks:
         return [c['id'] for c in self.calls('yield')]
 
     def downloaded_files(self) -> list:
-        return [c['path'] for c in self.calls('download') if not c['path'].endswith('_thumb.jpg')]
+        return [c['path'] for c in self.calls('download') if not c['path'].endswith('.thumb.jpg')]
 
     def sleeps(self) -> list:
         return [c['seconds'] for c in self.calls('sleep')]
 
     def file_states(self) -> dict:
         states = {}
-        for m in self.result()['messages']:
-            if 'file_status' in m:
-                states[m['file_status']['state']] = states.get(m['file_status']['state'], 0) + 1
+        for item in self.archive()['items']:
+            for medium in item.get('media', []):
+                states[medium['state']] = states.get(medium['state'], 0) + 1
         return states
 
 
@@ -148,7 +152,7 @@ class ExportRun(ExportChecks, unittest.TestCase):
             with redirect_stdout(out), redirect_stderr(err):
                 cli.run(self.arguments(args, chat), settings,
                         client_factory=lambda s, session_dir: client_class(SESSION_NAME, workdir=session_dir),
-                        session_dir=os.path.join(self.dir, 'session'), sleep=recording_sleep(self.log),
+                        session_dir=os.path.join(self.dir, 'session'), sleep=recording_sleep(self.log), zone=timezone.utc,
                         **({'clock': clock} if clock else {}))
         except SimulatedKill:
             code = 9
@@ -182,6 +186,5 @@ class SubprocessRun(ExportChecks, unittest.TestCase):
 
 
 def message_id_of(file_name: str) -> int:
-    # photo_12.jpg, video_12.mp4 or 12_name.ext
-    stem = file_name.split('.')[0]
-    return int(stem.split('_')[1] if not stem[0].isdigit() else stem.split('_')[0])
+    # 12.mp4, 12.thumb.jpg or 12_name.ext
+    return int(file_name.split('.')[0].split('_')[0])

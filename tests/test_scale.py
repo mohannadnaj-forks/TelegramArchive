@@ -22,7 +22,7 @@ class Scale(SubprocessRun):
         print(f"\n{COUNT:,} messages: {last['current'] / 2 ** 20:.0f} MB traced at the end of listing, "
               f"{per_message:.0f} bytes per message, listing took {last['time'] - first['time']:.1f}s")
         self.assertLess(per_message, 100)
-        self.assertEqual(len(self.result()['messages']), COUNT)
+        self.assertEqual(len(self.item_ids()), COUNT)
 
 
 if __name__ == '__main__':

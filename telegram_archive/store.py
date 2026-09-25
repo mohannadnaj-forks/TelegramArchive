@@ -17,9 +17,12 @@ VERSION = 1
 SCHEMA = '''
 CREATE TABLE IF NOT EXISTS archive (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS items (
-    id TEXT PRIMARY KEY, sort INTEGER NOT NULL, month TEXT NOT NULL,
-    file_state TEXT, file_size INTEGER, data TEXT NOT NULL);
+    id TEXT PRIMARY KEY, sort INTEGER NOT NULL, date TEXT NOT NULL, data TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS items_sort ON items (sort);
+CREATE TABLE IF NOT EXISTS media (
+    item_id TEXT NOT NULL, position INTEGER NOT NULL, state TEXT NOT NULL, size INTEGER, data TEXT NOT NULL,
+    PRIMARY KEY (item_id, position));
+CREATE INDEX IF NOT EXISTS media_state ON media (state);
 CREATE TABLE IF NOT EXISTS runs (id INTEGER PRIMARY KEY, data TEXT NOT NULL);
 '''
 
@@ -77,28 +80,60 @@ class Archive:
     def set(self, key: str, value) -> None:
         self.db.execute('INSERT OR REPLACE INTO archive (key, value) VALUES (?, ?)', (key, dumps(value)))
 
-    def put_item(self, record: dict) -> None:
-        status = record.get('file_status') or {}
-        self.db.execute('INSERT OR REPLACE INTO items (id, sort, month, file_state, file_size, data) VALUES (?, ?, ?, ?, ?, ?)',
-                        (str(record['id']), record['id'], record['date'][:7], status.get('state'), status.get('size'),
-                         dumps(record)))
+    def put_item(self, item: dict, sort: int) -> None:
+        """Adds or replaces the item and its media; sort orders items (Telegram: the message id)."""
+        media = item.get('media') or []
+        data = {k: v for k, v in item.items() if k != 'media'}
+        self.db.execute('INSERT OR REPLACE INTO items (id, sort, date, data) VALUES (?, ?, ?, ?)',
+                        (item['id'], sort, item['date'], dumps(data)))
+        self.db.execute('DELETE FROM media WHERE item_id = ?', (item['id'],))
+        for position, medium in enumerate(media):
+            self.set_medium(item['id'], position, medium)
 
-    def item(self, item_id) -> dict | None:
-        row = self.db.execute('SELECT data FROM items WHERE id = ?', (str(item_id),)).fetchone()
-        return json.loads(row[0]) if row else None
+    def set_medium(self, item_id: str, position: int, medium: dict) -> None:
+        self.db.execute('INSERT OR REPLACE INTO media (item_id, position, state, size, data) VALUES (?, ?, ?, ?, ?)',
+                        (item_id, position, medium['state'], medium.get('size'), dumps(medium)))
 
-    def items(self, newest_first: bool = False, with_files_not_downloaded: bool = False):
-        where = "WHERE file_state IS NOT NULL AND file_state != 'downloaded'" if with_files_not_downloaded else ''
+    def media_of(self, item_id: str) -> list:
+        rows = self.db.execute('SELECT data FROM media WHERE item_id = ? ORDER BY position', (item_id,))
+        return [json.loads(data) for (data,) in rows]
+
+    def item(self, item_id: str) -> dict | None:
+        row = self.db.execute('SELECT data FROM items WHERE id = ?', (item_id,)).fetchone()
+        if row is None:
+            return None
+        item = json.loads(row[0])
+        media = self.media_of(item_id)
+        return {**item, 'media': media} if media else item
+
+    def items(self, newest_first: bool = False):
+        """Every item with its media, in sort order."""
         order = 'DESC' if newest_first else 'ASC'
-        for (data,) in self.db.execute(f'SELECT data FROM items {where} ORDER BY sort {order}'):
-            yield json.loads(data)
+        rows = self.db.execute(f'SELECT i.id, i.data, m.data FROM items i LEFT JOIN media m ON m.item_id = i.id '
+                               f'ORDER BY i.sort {order}, m.position')
+        current, current_id = None, None
+        for item_id, data, medium in rows:
+            if item_id != current_id:
+                if current is not None:
+                    yield current
+                current, current_id = json.loads(data), item_id
+            if medium is not None:
+                current.setdefault('media', []).append(json.loads(medium))
+        if current is not None:
+            yield current
+
+    def media_not_downloaded(self) -> list:
+        """(item id, position, item date, medium) for every file not on disk, newest item first."""
+        rows = self.db.execute("SELECT m.item_id, m.position, i.date, m.data FROM media m JOIN items i ON i.id = m.item_id "
+                               "WHERE m.state != 'downloaded' ORDER BY i.sort DESC, m.position")
+        for item_id, position, date, data in rows:
+            yield item_id, position, date, json.loads(data)
 
     def count(self) -> int:
         return self.db.execute('SELECT COUNT(*) FROM items').fetchone()[0]
 
     def file_states(self) -> dict:
-        rows = self.db.execute('SELECT file_state, COUNT(*), COALESCE(SUM(file_size), 0) FROM items '
-                               'WHERE file_state IS NOT NULL GROUP BY file_state')
+        rows = self.db.execute('SELECT state, COUNT(*), COALESCE(SUM(size), 0) FROM media GROUP BY state')
         return {state: {'count': count, 'bytes': size} for state, count, size in rows}
 
     def downloaded_bytes(self) -> int:

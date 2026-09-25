@@ -373,6 +373,7 @@
         .album .media img { object-fit: cover; }
         .media.photo img { cursor: zoom-in; }
         .media.sticker { background: none; width: 180px; aspect-ratio: 1; margin: 10px 14px 0; }
+        .sticker-emoji { display: grid; place-items: center; width: 100%; height: 100%; font-size: 96px; }
 
         .album { display: grid; gap: 2px; grid-template-columns: repeat(6, minmax(0, 1fr)); background: var(--card); }
         .album .media { aspect-ratio: 1; grid-column: span 2; }
@@ -491,6 +492,7 @@
         }
         .post-foot a { color: inherit; }
         .post-foot .views { display: inline-flex; align-items: center; gap: 4px; }
+        .post-foot .signature { margin-right: auto; }
         .post-foot a:hover { color: var(--accent); }
 
         .post-empty {
@@ -748,7 +750,7 @@
         // ---- formatting
 
         function parseLocal(s) {
-            const [d, t = '00:00:00'] = s.split('T');
+            const [d, t = '00:00:00'] = s.slice(0, 19).split('T');
             const [y, m, day] = d.split('-').map(Number);
             const [hh, mm, ss] = t.split(':').map(Number);
             return new Date(y, m - 1, day, hh || 0, mm || 0, ss || 0);
@@ -799,96 +801,48 @@
             return colors[n % colors.length];
         }
 
-        // ---- adapter: result.json record -> what the page renders
+        // ---- adapter: archive item -> what the page renders
 
-        const KIND_BY_TYPE = {
-            video_file: 'video', animation: 'animation', video_message: 'round',
-            sticker: 'sticker', voice_message: 'voice', audio_file: 'audio',
-        };
         const KIND_LABEL = {
-            photo: 'Photo', video: 'Video', animation: 'GIF', round: 'Video message', sticker: 'Sticker',
-            voice: 'Voice message', audio: 'Audio', document: 'File',
+            photo: 'Photo', video: 'Video', animation: 'GIF', round_video: 'Video message', sticker: 'Sticker',
+            voice: 'Voice message', audio: 'Audio', document: 'File', contact: 'Contact',
         };
-
-        function textOf(value) {
-            if (!value) return { plain: '', entities: [] };
-            if (typeof value === 'string') return { plain: value, entities: [] };
-            const last = value[value.length - 1];
-            const plain = typeof last === 'string' ? last : '';
-            const entities = [];
-            let from = 0;
-            for (const e of value.slice(0, -1)) {
-                if (!e || typeof e !== 'object' || !e.text) continue;
-                let start = typeof e.offset === 'number' ? e.offset : plain.indexOf(e.text, from);
-                if (start < 0) start = plain.indexOf(e.text);
-                if (start < 0) continue;
-                const length = typeof e.length === 'number' ? e.length : e.text.length;
-                entities.push({ type: e.type, start, end: start + length, href: e.href || null });
-                from = start;
-            }
-            return { plain, entities };
-        }
 
         // File names may hold '#' or '%', which a URL would read as a fragment or an escape.
         const fileUrl = p => p && p.split('/').map(encodeURIComponent).join('/');
 
-        function fromTelegram(r) {
-            const status = r.file_status || null;
-            const media = [];
-            if (status || r.photo || r.file) {
-                const kind = r.photo ? 'photo' : (KIND_BY_TYPE[r.media_type] || 'document');
-                const ok = !status || status.state === 'downloaded';
-                const path = ok ? (r.photo || r.file) : null;
-                const thumb = ok && r.thumbnail && r.thumbnail !== r.file && /\.(jpe?g|png|webp)$/i.test(r.thumbnail) ? r.thumbnail : null;
-                media.push({
-                    kind, path: fileUrl(path), thumb: fileUrl(thumb),
-                    width: r.width || null, height: r.height || null,
-                    duration: r.duration_seconds || null,
-                    size: status && status.size || null,
-                    mime: r.mime_type || null,
-                    title: [r.performer, r.title].filter(Boolean).join(' – ') || null,
-                    name: path ? path.split('/').pop() : null,
-                    missing: ok ? null : status,
-                });
-            }
+        function viewItem(r) {
+            const text = r.text || { plain: '' };
             return {
-                id: r.id,
+                ...r,
+                id: Number(r.id),
                 date: parseLocal(r.date),
                 dayKey: r.date.slice(0, 10),
                 monthKey: r.date.slice(0, 7),
-                ts: r.date_unixtime,
-                author: r.from || '',
-                forwardedFrom: r.forwarded_from || null,
-                replyTo: r.reply_to_message_id || null,
-                text: textOf(r.caption !== undefined ? r.caption : r.text),
-                media,
-                location: r.location_information || null,
-                contact: r.contact_information || null,
-                groupId: r.media_group_id || null,
-                views: typeof r.views === 'number' ? r.views : null,
+                replyTo: r.reply_to ? Number(r.reply_to) : null,
+                text: { plain: text.plain, entities: (text.entities || []).map(e => ({ ...e, start: e.offset, end: e.offset + e.length })) },
+                media: (r.media || []).map(m => m.state === 'downloaded'
+                    ? { ...m, path: fileUrl(m.path), thumbnail: fileUrl(m.thumbnail), missing: null }
+                    : { ...m, path: null, thumbnail: null, missing: m }),
             };
         }
 
         function groupPosts(items) {
             const posts = [];
-            const albums = new Map();
-            let current = null;
+            const groups = new Map();
             for (const item of items) {
-                let post = null;
-                if (item.media.length && item.groupId) post = albums.get(item.groupId) || null;
-                else if (item.media.length && current && current.media.length && !current.first.groupId
-                    && item.ts === current.last.ts && !(item.text.plain && current.text.plain)) post = current;
-                if (post && post.items.length < 10) {
+                const post = item.group && item.media.length ? groups.get(item.group) : null;
+                if (post) {
                     post.items.push(item);
                     post.media.push(...item.media);
-                    if (!post.text.plain) post.text = item.text;
                     post.last = item;
-                } else {
-                    current = { id: item.id, items: [item], media: [...item.media], text: item.text, first: item, last: item };
-                    posts.push(current);
-                    if (item.groupId && item.media.length) albums.set(item.groupId, current);
+                    continue;
                 }
+                const created = { id: item.id, items: [item], media: [...item.media], first: item, last: item };
+                posts.push(created);
+                if (item.group && item.media.length) groups.set(item.group, created);
             }
+            for (const post of posts) post.text = (post.items.find(i => i.text.plain) || post.first).text;
             return posts;
         }
 
@@ -919,7 +873,7 @@
             const pending = {};
             pending.promise = new Promise((resolve, reject) => {
                 pending.resolve = records => {
-                    const items = records.map(fromTelegram);
+                    const items = records.map(viewItem);
                     const chunk = { ci, posts: groupPosts(items), byId: new Map(), pages: null, version: -1 };
                     for (const post of chunk.posts) for (const item of post.items) chunk.byId.set(item.id, post);
                     chunkCache.set(meta.name, chunk);
@@ -1036,7 +990,7 @@
                 case 'email': return linked ? node : tagged('a', { href: 'mailto:' + covered });
                 case 'link':
                 case 'text_link': {
-                    const href = safeHref(entity.href || covered);
+                    const href = safeHref(entity.url || covered);
                     return linked || !href ? node : tagged('a', { href, target: '_blank', rel: 'noopener noreferrer' });
                 }
                 default: return node;
@@ -1096,7 +1050,8 @@
                     return `Not downloaded: ${what} were switched off for this export`;
                 }
                 case 'failed': return 'Download failed' + (status.error ? ': ' + status.error : '');
-                default: return 'Not in this export';
+                case 'unavailable': return 'No longer available on Telegram';
+                default: return 'Not downloaded yet; run the export again';
             }
         }
 
@@ -1149,11 +1104,18 @@
                     h('img', { src: m.path, loading: 'lazy', decoding: 'async', width: m.width, height: m.height, alt: '', 'data-full': m.path }));
             }
             if (m.kind === 'sticker') {
-                return h('div', { class: 'media sticker' },
-                    h('img', { src: m.path, loading: 'lazy', decoding: 'async', alt: 'Sticker' }));
+                const label = 'Sticker' + (m.emoji ? ' ' + m.emoji : '');
+                if (m.animated === 'webm') {
+                    return h('div', { class: 'media sticker' },
+                        h('video', { src: m.path, autoplay: true, loop: true, muted: true, playsinline: true, 'aria-label': label }));
+                }
+                const still = m.animated ? m.thumbnail : m.path;
+                return h('div', { class: 'media sticker' }, still
+                    ? h('img', { src: still, loading: 'lazy', decoding: 'async', alt: label, title: m.emoji || null })
+                    : h('div', { class: 'sticker-emoji', text: m.emoji || '🙂', title: label }));
             }
             const box = h('div', { class: cls, style: single ? aspect(m) : null, 'data-video': single ? null : m.path, 'data-kind': m.kind });
-            if (m.thumb) box.append(h('img', { src: m.thumb, loading: 'lazy', decoding: 'async', width: m.width, height: m.height, alt: '' }));
+            if (m.thumbnail) box.append(h('img', { src: m.thumbnail, loading: 'lazy', decoding: 'async', width: m.width, height: m.height, alt: '' }));
             if (m.duration) box.append(h('span', { class: 'badge', text: m.kind === 'animation' ? 'GIF' : fmtDuration(m.duration) }));
             const button = h('button', { class: 'play', 'aria-label': 'Play ' + KIND_LABEL[m.kind].toLowerCase() }, h('i'));
             button.firstChild.innerHTML = ICONS.play;
@@ -1162,10 +1124,18 @@
             return box;
         }
 
+        function renderContact(m) {
+            const c = m.contact;
+            const line = `👤 ${[c.first_name, c.last_name].filter(Boolean).join(' ')} · ${c.phone}`;
+            return h('div', { class: 'extra' }, m.path ? h('a', { href: m.path, text: line, title: 'Contact card' }) : line);
+        }
+
         function renderFile(m) {
-            const ext = m.name && m.name.includes('.') ? m.name.split('.').pop().slice(0, 4) : (m.kind === 'voice' ? 'ogg' : 'file');
+            if (m.kind === 'contact') return renderContact(m);
+            const fileName = m.name || (m.path ? decodeURIComponent(m.path.split('/').pop()) : null);
+            const ext = fileName && fileName.includes('.') ? fileName.split('.').pop().slice(0, 4) : (m.kind === 'voice' ? 'ogg' : 'file');
             const meta = [KIND_LABEL[m.kind], m.duration ? fmtDuration(m.duration) : null, m.size ? fmtSize(m.size) : null].filter(Boolean).join(' · ');
-            const name = m.title || m.name || KIND_LABEL[m.kind];
+            const name = [m.performer, m.title].filter(Boolean).join(' – ') || fileName || KIND_LABEL[m.kind];
             const body = h('div', { class: 'file-body' },
                 m.path ? h('a', { class: 'file-name', href: m.path, target: '_blank', text: name, title: name }) : h('div', { class: 'file-name', text: name }),
                 h('div', { class: 'file-meta' }, meta, m.missing ? h('div', { class: 'warn', text: missingReason(m.missing) }) : null));
@@ -1173,7 +1143,7 @@
             return h('div', { class: 'file' + (m.missing ? ' missing-file' : '') }, h('div', { class: 'file-icon', text: ext }), body);
         }
 
-        const VISUAL = new Set(['photo', 'video', 'animation', 'round', 'sticker']);
+        const VISUAL = new Set(['photo', 'video', 'animation', 'round_video', 'sticker']);
 
         function renderMedia(post) {
             const visual = post.media.filter(m => VISUAL.has(m.kind));
@@ -1201,8 +1171,21 @@
         const postOf = new WeakMap();
         let showAuthor = false;
 
+        const SERVICE_LABELS = {
+            pinned_message: 'Message pinned', channel_chat_created: 'Channel created', group_chat_created: 'Group created',
+            supergroup_chat_created: 'Group created', new_chat_title: 'Title changed', new_chat_photo: 'Photo changed',
+            delete_chat_photo: 'Photo removed', new_chat_members: 'Members joined', left_chat_member: 'A member left',
+            migrate_to_chat_id: 'Group upgraded', migrate_from_chat_id: 'Group upgraded',
+        };
+
         function isEmptyPost(post) {
-            return !post.media.length && !post.text.plain && !post.first.location && !post.first.contact;
+            return !post.media.length && !post.text.plain && !post.first.location;
+        }
+
+        function emptyLabel(item) {
+            const service = item.extra && item.extra.telegram && item.extra.telegram.service;
+            if (!service) return 'Message not recorded in this export';
+            return SERVICE_LABELS[service] || service.charAt(0).toUpperCase() + service.slice(1).replace(/_/g, ' ');
         }
 
         function timeLink(post) {
@@ -1225,34 +1208,32 @@
             const first = post.first;
             if (isEmptyPost(post)) {
                 const el = h('div', { class: 'post-empty', 'data-id': post.id },
-                    h('span', { text: 'Message not recorded in this export' }), timeLink(post));
+                    h('span', { text: emptyLabel(post.first) }), timeLink(post));
                 postOf.set(el, post);
                 return el;
             }
             const card = h('article', { class: 'post', 'data-id': post.id });
             const head = [];
-            if (showAuthor && first.author) head.push(h('div', { class: 'post-author', dir: 'auto', text: first.author }));
-            if (first.forwardedFrom) head.push(h('div', { class: 'post-forward', dir: 'auto' }, 'Forwarded from ', h('strong', { text: first.forwardedFrom })));
+            if (showAuthor && first.author) head.push(h('div', { class: 'post-author', dir: 'auto', text: first.author.name }));
+            if (first.forward) head.push(h('div', { class: 'post-forward', dir: 'auto' }, 'Forwarded from ', h('strong', { text: first.forward.from.name })));
             if (first.replyTo) head.push(renderReply(first.replyTo));
             if (head.length) card.append(h('div', { class: 'post-head' }, head));
             card.append(...renderMedia(post));
             if (first.location) {
-                const { latitude, longitude } = first.location;
+                const { latitude, longitude, name, address } = first.location;
                 card.append(h('div', { class: 'extra' }, '📍 ', h('a', {
                     href: `https://www.openstreetmap.org/?mlat=${latitude}&mlon=${longitude}#map=15/${latitude}/${longitude}`,
-                    target: '_blank', rel: 'noopener noreferrer', text: `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`,
+                    target: '_blank', rel: 'noopener noreferrer',
+                    text: [name, address].filter(Boolean).join(', ') || `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`,
                 })));
             }
-            if (first.contact) {
-                const c = first.contact;
-                card.append(h('div', { class: 'extra', text: `👤 ${[c.fist_name, c.last_name].filter(Boolean).join(' ')} · ${c.phone_number}` }));
-            }
-            if (post.text.plain) card.append(renderText(post.text));
+            for (const item of post.items) if (item.text.plain) card.append(renderText(item.text));
             const foot = h('div', { class: 'post-foot' });
-            const views = Math.max(...post.items.map(i => i.views || 0));
+            const signature = first.extra && first.extra.telegram && first.extra.telegram.signature;
+            if (signature) foot.append(h('span', { class: 'signature', dir: 'auto', text: signature }));
+            const views = Math.max(...post.items.map(i => (i.counts && i.counts.views) || 0));
             if (views) foot.append(h('span', { class: 'views', title: fmtNumber(views) + ' views', text: fmtCompact(views) + ' views' }));
-            const username = INDEX.chat && INDEX.chat.username;
-            if (username) foot.append(h('a', { href: `https://t.me/${encodeURIComponent(username)}/${post.id}`, target: '_blank', rel: 'noopener noreferrer', title: 'Open in Telegram', text: 't.me' }));
+            if (first.url) foot.append(h('a', { href: first.url, target: '_blank', rel: 'noopener noreferrer', title: 'Open in Telegram', text: 't.me' }));
             foot.append(timeLink(post));
             card.append(foot);
             postOf.set(card, post);
@@ -1267,8 +1248,9 @@
             const m = post.media.find(x => VISUAL.has(x.kind));
             const tile = h('button', { class: 'tile' + (m.missing ? ' missing' : ''), 'data-id': post.id, title: fmtDay(post.first.date) });
             if (m.missing) tile.append(h('span', { class: 'missing-kind', text: KIND_LABEL[m.kind] + ' · not downloaded' }));
-            else if (m.kind === 'photo' || m.kind === 'sticker' || m.thumb) {
-                tile.append(h('img', { src: m.thumb || m.path, loading: 'lazy', decoding: 'async', alt: '' }));
+            else {
+                const still = m.thumbnail || (m.kind === 'photo' || (m.kind === 'sticker' && !m.animated) ? m.path : null);
+                if (still) tile.append(h('img', { src: still, loading: 'lazy', decoding: 'async', alt: '' }));
             }
             if (!m.missing && m.kind !== 'photo' && m.kind !== 'sticker') {
                 const mark = h('span', { class: 'play-mark' });
@@ -1849,7 +1831,7 @@
             if (!searchLoading) {
                 searchLoading = new Promise((resolve, reject) => {
                     searchRowsReady = rows => {
-                        searchRows = rows.map(([id, date, text]) => ({ id, date, text, norm: normalize(text) }));
+                        searchRows = rows.map(([id, date, text]) => ({ id: Number(id), date, text, norm: normalize(text) }));
                         resolve();
                     };
                     loadScript('data/search.js').catch(err => { searchLoading = null; reject(err); });
@@ -2088,10 +2070,10 @@
 
         // ---- start
 
-        const CHAT_TYPES = { public_channel: 'Channel', public_group: 'Group', public_supergroup: 'Group', personal_chat: 'Private chat' };
+        const ACCOUNT_KINDS = { channel: 'Channel', group: 'Group', private: 'Private chat', bot: 'Bot', saved: 'Saved Messages' };
 
         function buildHeader() {
-            const chat = INDEX.chat || {};
+            const chat = INDEX.account || {};
             const name = chat.name || 'Telegram Archive';
             document.title = name + ' · Telegram Archive';
             $('chat-name').textContent = name;
@@ -2099,7 +2081,7 @@
                 el.style.background = avatarColor(chat.id || name);
                 el.textContent = initials(name);
                 if (chat.photo) {
-                    const img = h('img', { src: chat.photo, alt: '' });
+                    const img = h('img', { src: fileUrl(chat.photo), alt: '' });
                     img.onerror = () => { el.textContent = initials(name); };
                     el.replaceChildren(img);
                 }
@@ -2108,12 +2090,12 @@
             fillAvatar($('avatar'));
             const months = INDEX.months;
             const range = months.length ? monthLabel(months[0].key) + (months.length > 1 ? ' – ' + monthLabel(months[months.length - 1].key) : '') : '';
-            const meta = [chat.username ? '@' + chat.username : null, CHAT_TYPES[chat.type] || 'Chat', fmtCount(INDEX.total, 'message', 'messages'), range].filter(Boolean).join(' · ');
+            const meta = [chat.username ? '@' + chat.username : null, ACCOUNT_KINDS[chat.kind] || 'Chat', fmtCount(INDEX.total, 'message', 'messages'), range].filter(Boolean).join(' · ');
             $('chat-meta').textContent = meta;
-            showAuthor = chat.type !== 'public_channel';
+            showAuthor = chat.kind !== 'channel';
 
-            const title = chat.username
-                ? h('a', { href: 'https://t.me/' + encodeURIComponent(chat.username), target: '_blank', rel: 'noopener noreferrer', text: name })
+            const title = chat.url
+                ? h('a', { href: chat.url, target: '_blank', rel: 'noopener noreferrer', text: name })
                 : name;
             $('feed-start').replaceChildren(fillAvatar(h('div', { class: 'avatar' })), h('h2', { dir: 'auto' }, title),
                 h('div', { text: meta }),
@@ -2163,7 +2145,7 @@
                 return;
             }
             for (const month of INDEX.months) {
-                for (const chunk of month.chunks) CHUNKS.push({ ...chunk, month: month.key });
+                for (const chunk of month.chunks) CHUNKS.push({ ...chunk, first_id: Number(chunk.first_id), last_id: Number(chunk.last_id), month: month.key });
             }
             applyView();
             buildHeader();
