@@ -51,7 +51,7 @@ def build_parser(download_path: str | None) -> argparse.ArgumentParser:
     parser.add_argument('--since', type=parse_date, metavar='YYYY-MM-DD', help="only messages from this day on")
     parser.add_argument('--until', type=parse_date, metavar='YYYY-MM-DD', help="only messages up to and including this day")
     parser.add_argument('--max-file-size', type=parse_size, default='200M', metavar='SIZE', help="leave out files larger than this, e.g. 50M, 1G; 0 for no limit (default: 200M)")
-    parser.add_argument('--max-total-size', type=parse_size, default='10G', metavar='SIZE', help="stop, with progress saved, before a chat's media passes this; 0 for no limit (default: 10G)")
+    parser.add_argument('--max-total-size', type=parse_size, default='10G', metavar='SIZE', help="leave out the oldest files that would take a chat's media past this, and finish; 0 for no limit (default: 10G)")
     parser.add_argument('--refresh', action='store_true', help="re-read the whole history, refreshing edited messages, instead of only messages newer than the export")
     parser.add_argument('--viewer-only', action='store_true', help="rebuild index.html and data.js from the existing result.json, without connecting to Telegram; chats may also be export directories")
     return parser
@@ -139,6 +139,9 @@ def run(argv: list, env: Mapping[str, str], client_factory=create_client, sessio
         rebuild_viewers(args.chats, options.output, settings.resume_enabled)
         return
 
+    if not (settings.api_id or '').strip().isdigit() or not settings.api_hash:
+        sys.exit("❌ API_ID and API_HASH are not set. Create an application at https://my.telegram.org, "
+                 "then put its API_ID and API_HASH in .env (see .env.example) or in the environment.")
     configure_logging()
     os.makedirs(session_dir, exist_ok=True)
     stop = StopRequest()

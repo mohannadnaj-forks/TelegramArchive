@@ -46,6 +46,13 @@ class EndToEnd(SubprocessRun):
 
 
 class Session(SubprocessRun):
+    def test_missing_api_settings_are_explained_before_anything_is_created(self):
+        self.assertEqual(self.run_bot(count=3, env={'API_ID': '', 'API_HASH': ''}), 1)
+        self.assertIn('API_ID and API_HASH are not set', self.output)
+        self.assertNotIn('Traceback', self.output)
+        self.assertFalse(os.path.exists(self.out))
+        self.assertFalse(os.path.exists(os.path.join(self.program, '.telegram')))
+
     def test_the_session_lives_next_to_the_program(self):
         self.assertEqual(self.run_bot(count=3), 0, self.output)
         [client] = self.calls('client')
