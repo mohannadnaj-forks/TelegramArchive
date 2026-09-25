@@ -57,8 +57,8 @@ def month_entry(key: str, items: list, parts: list) -> dict:
 
 
 def viewer_files(archive: Archive):
-    """(file name, content) for every file under data/, index.js last; items are read one month at a time."""
-    months, search, total = [], [], 0
+    """(path under data/, content) for every viewer file, index.js last; items are read one month at a time."""
+    months, total = [], 0
     for key, group in itertools.groupby(archive.items(), key=lambda item: item['date'][:7]):
         items = list(group)
         parts = split_chunks(items)
@@ -67,8 +67,8 @@ def viewer_files(archive: Archive):
         total += len(items)
         for chunk, part in zip(entry['chunks'], parts):
             yield f"{chunk['name']}.js", f"archiveChunk({compact_js(chunk['name'])},{compact_js(part)});\n"
-        search.extend([item['id'], item['date'][:16], search_text(item)] for item in items)
-    yield 'search.js', f'archiveSearch({compact_js(search)});\n'
+        search = [[item['id'], item['date'][:16], search_text(item)] for item in items]
+        yield f'search/{key}.js', f'archiveSearch({compact_js(key)},{compact_js(search)});\n'
     runs = archive.runs()
     index = {'format': FORMAT, 'version': VERSION, 'source': archive.get('source', 'telegram'),
              'account': archive.get('account', {}), 'updated': runs[-1].get('updated') if runs else None,
@@ -88,15 +88,17 @@ def generate_index_html(export_path: str, archive: Archive, template_path: str =
     data_dir = os.path.join(export_path, 'data')
     written = set()
     try:
-        os.makedirs(data_dir, exist_ok=True)
+        os.makedirs(os.path.join(data_dir, 'search'), exist_ok=True)
         for name, content in viewer_files(archive):
-            with open(os.path.join(data_dir, f'{name}.tmp'), 'w', encoding='utf-8') as f:
+            path = os.path.join(data_dir, *name.split('/'))
+            with open(f'{path}.tmp', 'w', encoding='utf-8') as f:
                 f.write(content)
-            os.replace(os.path.join(data_dir, f'{name}.tmp'), os.path.join(data_dir, name))
-            written.add(name)
-        for name in os.listdir(data_dir):
-            if name not in written:
-                os.remove(os.path.join(data_dir, name))
+            os.replace(f'{path}.tmp', path)
+            written.add(os.path.normpath(path))
+        for folder, _, names in os.walk(data_dir):
+            for name in names:
+                if os.path.normpath(os.path.join(folder, name)) not in written:
+                    os.remove(os.path.join(folder, name))
     except Exception as e:
         logger.warning(f"⚠️ Failed to generate viewer data: {e}")
         return

@@ -710,13 +710,16 @@
     <script>
         let INDEX = null;
         const pendingChunks = new Map();
-        let searchRowsReady = null;
+        const pendingSearch = new Map();
         function archiveIndex(data) { INDEX = data; }
         function archiveChunk(name, records) {
             const pending = pendingChunks.get(name);
             if (pending) pending.resolve(records);
         }
-        function archiveSearch(rows) { if (searchRowsReady) searchRowsReady(rows); }
+        function archiveSearch(month, rows) {
+            const pending = pendingSearch.get(month);
+            if (pending) pending(rows);
+        }
     </script>
     <script src="data/index.js"></script>
     <script>
@@ -1815,8 +1818,10 @@
 
         // ---- search
 
-        let searchRows = null;
-        let searchLoading = null;
+        const SEARCH_CACHE_ROWS = 150000;
+        const searchCache = new Map();
+        let searchCachedRows = 0;
+        let searchGeneration = 0;
         let searchTimer = null;
         let selected = -1;
 
@@ -1827,17 +1832,33 @@
                 .toLowerCase();
         }
 
-        function loadSearch() {
-            if (!searchLoading) {
-                searchLoading = new Promise((resolve, reject) => {
-                    searchRowsReady = rows => {
-                        searchRows = rows.map(([id, date, text]) => ({ id: Number(id), date, text, norm: normalize(text) }));
-                        resolve();
-                    };
-                    loadScript('data/search.js').catch(err => { searchLoading = null; reject(err); });
-                });
+        // data/search/<month>.js holds that month's rows; months are loaded as a search reaches them and the
+        // oldest loaded are dropped past SEARCH_CACHE_ROWS, so memory does not grow with the archive.
+        function loadSearchMonth(month) {
+            const cached = searchCache.get(month);
+            if (cached) {
+                searchCache.delete(month);
+                searchCache.set(month, cached);
+                return Promise.resolve(cached);
             }
-            return searchLoading;
+            return new Promise((resolve, reject) => {
+                pendingSearch.set(month, rows => {
+                    pendingSearch.delete(month);
+                    const loaded = rows.map(([id, date, text]) => ({ id: Number(id), date, text, norm: normalize(text) }));
+                    searchCache.set(month, loaded);
+                    searchCachedRows += loaded.length;
+                    for (const [key, old] of searchCache) {
+                        if (searchCachedRows <= SEARCH_CACHE_ROWS || key === month) break;
+                        searchCache.delete(key);
+                        searchCachedRows -= old.length;
+                    }
+                    resolve(loaded);
+                });
+                loadScript('data/search/' + encodeURIComponent(month) + '.js').catch(err => {
+                    pendingSearch.delete(month);
+                    reject(err);
+                });
+            });
         }
 
         function highlight(text, term) {
@@ -1859,32 +1880,54 @@
         async function runSearch(query) {
             const panel = $('results');
             const terms = normalize(query).split(/\s+/).filter(Boolean);
+            const generation = ++searchGeneration;
             if (!terms.length) { panel.hidden = true; return; }
             panel.hidden = false;
-            if (!searchRows) {
-                panel.replaceChildren(h('div', { class: 'results-head', text: 'Loading search…' }));
-                try { await loadSearch(); } catch (err) { panel.replaceChildren(h('div', { class: 'results-head', text: err.message })); return; }
-                if ($('search').value !== query) return;
-            }
             const inRange = r => (!filter.from || r.date.slice(0, 10) >= filter.from) && (!filter.to || r.date.slice(0, 10) <= filter.to);
-            const matches = searchRows.filter(r => inRange(r) && terms.every(t => r.norm.includes(t))).reverse();
-            selected = -1;
-            const head = h('div', { class: 'results-head' });
-            panel.replaceChildren(head);
+            const months = INDEX.months.map(m => m.key)
+                .filter(key => (!filter.from || key >= filter.from.slice(0, 7)) && (!filter.to || key <= filter.to.slice(0, 7)))
+                .reverse();
+            const matches = [];
+            let scanned = 0;
             let shown = 0;
-            const more = h('button', { class: 'results-more', onclick: e => { e.stopPropagation(); showMore(); } });
-            const showMore = () => {
+            selected = -1;
+            const head = h('div', { class: 'results-head', text: 'Searching…' });
+            const more = h('button', { class: 'results-more', hidden: true, onclick: e => { e.stopPropagation(); showMore(); } });
+            panel.replaceChildren(head, more);
+            const scan = async target => {
+                while (matches.length < target && scanned < months.length) {
+                    const rows = await loadSearchMonth(months[scanned]);
+                    if (generation !== searchGeneration) return false;
+                    scanned++;
+                    for (let i = rows.length - 1; i >= 0; i--) {
+                        const r = rows[i];
+                        if (inRange(r) && terms.every(t => r.norm.includes(t))) matches.push(r);
+                    }
+                }
+                return true;
+            };
+            const showMore = async () => {
+                more.disabled = true;
+                try {
+                    if (!await scan(shown + SEARCH_PAGE + 1)) return;
+                } catch (err) {
+                    head.textContent = err.message;
+                    return;
+                }
                 const rows = matches.slice(shown, shown + SEARCH_PAGE);
                 shown += rows.length;
                 more.before(...rows.map(row => h('button', { class: 'result', onclick: () => openResult(row.id) },
                     h('div', { class: 'result-date', text: fmtDay(parseLocal(row.date)) + ', ' + row.date.slice(11, 16) }),
                     h('div', { class: 'result-text', dir: 'auto' }, highlight(row.text, terms[0])))));
-                head.textContent = matches.length ? fmtCount(matches.length, 'message', 'messages') + (matches.length > shown ? ` · newest ${fmtNumber(shown)} shown` : '') : 'No messages found';
-                more.textContent = `Show older (${fmtNumber(Math.min(SEARCH_PAGE, matches.length - shown))} more)`;
-                more.hidden = shown >= matches.length;
+                const complete = scanned >= months.length;
+                if (!matches.length) head.textContent = 'No messages found';
+                else if (complete) head.textContent = fmtCount(matches.length, 'message', 'messages') + (matches.length > shown ? ` · newest ${fmtNumber(shown)} shown` : '');
+                else head.textContent = `${fmtNumber(matches.length)}+ messages · newest ${fmtNumber(shown)} shown`;
+                more.textContent = complete ? `Show older (${fmtNumber(Math.min(SEARCH_PAGE, matches.length - shown))} more)` : 'Show older';
+                more.hidden = shown >= matches.length && complete;
+                more.disabled = false;
             };
-            panel.append(more);
-            showMore();
+            await showMore();
         }
 
         function openResult(id) {
@@ -1900,7 +1943,7 @@
             runSearch(text);
         }
 
-        $('search').addEventListener('focus', () => { loadSearch().catch(() => {}); if ($('search').value.trim()) runSearch($('search').value); });
+        $('search').addEventListener('focus', () => { if ($('search').value.trim()) runSearch($('search').value); });
         $('search').addEventListener('input', e => {
             clearTimeout(searchTimer);
             searchTimer = setTimeout(() => runSearch(e.target.value), 150);

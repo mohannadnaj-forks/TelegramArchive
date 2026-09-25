@@ -23,8 +23,10 @@ class ViewerRun(ExportRun):
         self.assertEqual(chunk_name, name)
         return records
 
-    def search(self) -> list:
-        return read_js(self.path('data', 'search.js'), 'archiveSearch')[0]
+    def search(self, month: str = '2024-01') -> list:
+        name, rows = read_js(self.path('data', 'search', f'{month}.js'), 'archiveSearch')
+        self.assertEqual(name, month)
+        return rows
 
     def viewer_only(self, *targets) -> int:
         return self.run_bot('--viewer-only', *targets, chat='')
@@ -53,6 +55,7 @@ class ViewerData(ViewerRun):
         self.assertEqual(self.chunk('2024-01'), [items[i] for i in range(1, 744)])
         self.assertEqual(self.search()[:2], [['1', '2024-01-01T01:00', 'message 1'], ['2', '2024-01-01T02:00', 'message 2']])
         self.assertEqual(self.search()[2], ['3', '2024-01-01T03:00', ''])
+        self.assertEqual(self.search('2024-03')[-2], ['1499', '2024-03-03T11:00', 'message 1499'])
         with open(os.path.join(ROOT, '_index.html'), encoding='utf-8') as template, \
                 open(self.path('index.html'), encoding='utf-8') as page:
             self.assertEqual(page.read(), template.read())
@@ -69,10 +72,11 @@ class ViewerData(ViewerRun):
 
     def test_files_from_an_earlier_build_are_removed(self):
         self.run_bot(count=10)
-        for name in ('2019-01.js', 'stale.txt'):
+        for name in ('2019-01.js', 'stale.txt', os.path.join('search', '2019-01.js')):
             open(self.path('data', name), 'w').close()
         self.assertEqual(self.run_bot(count=10), 0, self.output)
-        self.assertEqual(sorted(os.listdir(self.path('data'))), ['2024-01.js', 'index.js', 'search.js'])
+        self.assertEqual(sorted(os.listdir(self.path('data'))), ['2024-01.js', 'index.js', 'search'])
+        self.assertEqual(os.listdir(self.path('data', 'search')), ['2024-01.js'])
 
 
 class ViewerOnly(ViewerRun):
