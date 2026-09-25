@@ -63,13 +63,13 @@ class ExportFolders(ExportRun):
             os.makedirs(os.path.join(self.out, f'ChatExport_testchat_{day}'))
         self.assertEqual(self.run_bot(count=3), 0, self.output)
         self.assertEqual(sorted(os.listdir(self.out)), ['ChatExport_testchat_2024-01-01', 'ChatExport_testchat_2025-06-30'])
-        self.assertTrue(os.path.exists(os.path.join(self.out, 'ChatExport_testchat_2025-06-30', 'result.json')))
+        self.assertTrue(os.path.exists(os.path.join(self.out, 'ChatExport_testchat_2025-06-30', 'archive.db')))
 
     def test_a_folder_of_a_chat_whose_name_starts_the_same_is_not_continued(self):
         os.makedirs(os.path.join(self.out, 'ChatExport_testchat_2024-01-01'))
         os.makedirs(os.path.join(self.out, 'ChatExport_testchat_bot_2024-01-01'))
         self.assertEqual(self.run_bot(count=3), 0, self.output)
-        self.assertTrue(os.path.exists(os.path.join(self.out, 'ChatExport_testchat_2024-01-01', 'result.json')))
+        self.assertTrue(os.path.exists(os.path.join(self.out, 'ChatExport_testchat_2024-01-01', 'archive.db')))
         self.assertEqual(os.listdir(os.path.join(self.out, 'ChatExport_testchat_bot_2024-01-01')), [])
 
     def test_an_output_folder_with_brackets_is_found_again(self):

@@ -23,7 +23,6 @@ class Settings:
     download_path: str | None = None
     media: dict = field(default_factory=lambda: dict.fromkeys(MEDIA_SETTINGS, False))
     chats: dict = field(default_factory=lambda: dict.fromkeys(CHAT_SETTINGS, False))
-    json_file_page_size: int | None = None
     flood_wait_max_sleep: int = 7200
     download_max_retries: int = 5
     zero_bytes_max_retries: int = 2
@@ -35,14 +34,12 @@ class Settings:
 
     @classmethod
     def from_env(cls, env: Mapping[str, str]) -> 'Settings':
-        page_size = env.get('JSON_FILE_PAGE_SIZE', '').strip().split('#')[0].strip()
         return cls(
             api_id=env.get('API_ID'),
             api_hash=env.get('API_HASH'),
             download_path=env.get('DOWNLOAD_PATH'),
             media={key: str_to_bool(env.get(media_setting_name(key))) for key in MEDIA_SETTINGS},
             chats={key: str_to_bool(env.get(f'CHAT_EXPORT_{name}')) for key, name in CHAT_SETTINGS.items()},
-            json_file_page_size=None if page_size.lower() in ('', 'none') else int(page_size),
             flood_wait_max_sleep=int(env.get('FLOOD_WAIT_MAX_SLEEP', '7200')),
             download_max_retries=int(env.get('DOWNLOAD_MAX_RETRIES', '5')),
             zero_bytes_max_retries=int(env.get('ZERO_BYTES_MAX_RETRIES', '2')),

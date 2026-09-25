@@ -16,7 +16,7 @@ from dotenv import load_dotenv
 from .download import Downloader
 from .export import ChatExport, RunOptions, StopRequest
 from .settings import Settings
-from .store import ExportFolder, find_export_dir, is_export_dir
+from .store import Archive, ArchiveVersionError, find_export_dir, is_export_dir
 from .telegram import api_chat_id, create_client, dialog_ids
 from .viewer import generate_index_html
 
@@ -53,7 +53,7 @@ def build_parser(download_path: str | None) -> argparse.ArgumentParser:
     parser.add_argument('--max-file-size', type=parse_size, default='200M', metavar='SIZE', help="leave out files larger than this, e.g. 50M, 1G; 0 for no limit (default: 200M)")
     parser.add_argument('--max-total-size', type=parse_size, default='10G', metavar='SIZE', help="leave out the oldest files that would take a chat's media past this, and finish; 0 for no limit (default: 10G)")
     parser.add_argument('--refresh', action='store_true', help="re-read the whole history, refreshing edited messages, instead of only messages newer than the export")
-    parser.add_argument('--viewer-only', action='store_true', help="rebuild index.html and data.js from the existing result.json, without connecting to Telegram; chats may also be export directories")
+    parser.add_argument('--viewer-only', action='store_true', help="rebuild index.html and data/ from the existing archive.db, without connecting to Telegram; chats may also be export directories")
     return parser
 
 
@@ -64,12 +64,20 @@ def rebuild_viewers(targets: list, output: str, resume: bool) -> None:
         else:
             name = str(parse_chat(target))
             export_directory = find_export_dir(output, name, resume)
-        chat_data = ExportFolder(export_directory).load()
-        if not chat_data:
-            print(f"❌ No result.json under {export_directory}")
+        if not is_export_dir(export_directory):
+            print(f"❌ No archive under {export_directory}")
             continue
-        generate_index_html(export_directory, chat_data)
-        print(f"✅ Rebuilt viewer for {chat_data.get('name', name)}: {len(chat_data['messages']):,} messages -> {export_directory}/index.html")
+        try:
+            archive = Archive(export_directory)
+        except ArchiveVersionError as e:
+            print(f"❌ {e}")
+            continue
+        try:
+            generate_index_html(export_directory, archive)
+            print(f"✅ Rebuilt viewer for {archive.get('account', {}).get('name', name)}: {archive.count():,} messages "
+                  f"-> {export_directory}/index.html")
+        finally:
+            archive.close()
 
 
 @contextlib.contextmanager
@@ -156,6 +164,8 @@ def run(argv: list, env: Mapping[str, str], client_factory=create_client, sessio
                                          stop, downloader_options, clock))
             except KeyboardInterrupt:
                 print("\n👋 Interrupted.")
+            except ArchiveVersionError as e:
+                sys.exit(f"❌ {e}")
     finally:
         signal.signal(signal.SIGINT, previous_handler)
 

@@ -20,6 +20,7 @@ import unittest
 from contextlib import redirect_stderr, redirect_stdout
 
 from telegram_archive import cli
+from telegram_archive.store import Archive
 from telegram_archive.telegram import SESSION_NAME
 from tests.fake_telegram import make_fake_client, recording_sleep
 
@@ -92,14 +93,25 @@ class ExportChecks:
         with open(self.path(*parts), encoding='utf-8') as f:
             return json.load(f)
 
+    def archive(self) -> dict:
+        """What archive.db holds: 'account', 'extra', 'runs' and 'items' (in id order)."""
+        archive = Archive(self.export_dir())
+        try:
+            return {'account': archive.get('account', {}), 'extra': archive.get('extra', {}),
+                    'runs': archive.runs(), 'items': list(archive.items())}
+        finally:
+            archive.close()
+
     def result(self) -> dict:
-        return self.read_json('result.json')
+        archive = self.archive()
+        return {**archive['account'], 'messages': archive['items']}
 
     def records(self) -> dict:
         return {m['id']: m for m in self.result()['messages']}
 
     def state(self) -> dict:
-        return self.read_json('export_state.json')
+        archive = self.archive()
+        return {'listed': archive['extra'].get('telegram', {}).get('listed', []), 'run': archive['runs'][-1]}
 
     def listed_ids(self) -> list:
         return [c['id'] for c in self.calls('yield')]

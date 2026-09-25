@@ -6,8 +6,6 @@ import subprocess
 import sys
 import unittest
 
-import json
-
 from tests.support import SubprocessRun
 
 
@@ -28,12 +26,11 @@ class EndToEnd(SubprocessRun):
         self.assertFalse(set(first) & set(self.downloaded_files()))
         self.assertEqual(self.file_states(), {'downloaded': 83 + 34})
 
-    def test_a_killed_run_is_recovered_from_the_journal(self):
+    def test_a_killed_run_keeps_what_it_saved(self):
         self.assertEqual(self.run_bot(checkpoint_seconds=0, kill_after_listed=120), 9)
-        with open(self.path('export_journal.jsonl'), encoding='utf-8') as f:
-            self.assertEqual(len([json.loads(line) for line in f]), 120)
+        self.assertEqual(len(self.result()['messages']), 120)
+        self.assertEqual(self.state()['run']['status'], 'running')
         self.assertEqual(self.run_bot(), 0, self.output)
-        self.assertIn('Recovered 120 messages', self.output)
         self.assertEqual([m['id'] for m in self.result()['messages']], list(range(1, 251)))
 
     def test_the_viewer_is_rebuilt_from_the_command_line(self):

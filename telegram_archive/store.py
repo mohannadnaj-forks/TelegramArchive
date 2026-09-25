@@ -1,19 +1,31 @@
-"""An export folder on disk: result.json or its parts, export_journal.jsonl and export_state.json.
+"""An archive on disk: archive.db (SQLite) in the archive's folder.
 
-docs/export-format.md describes the format.
+docs/export-format.md describes the format. Changes are saved in a transaction that commit() ends,
+so a run that is killed keeps everything up to its last commit.
 """
 import glob
 import json
-import logging
 import os
 import re
+import sqlite3
 from datetime import datetime
 
-logger = logging.getLogger(__name__)
+ARCHIVE_FILE = 'archive.db'
+FORMAT = 'archive'
+VERSION = 1
 
-RESULT_FILE = 'result.json'
-JOURNAL_FILE = 'export_journal.jsonl'
-STATE_FILE = 'export_state.json'
+SCHEMA = '''
+CREATE TABLE IF NOT EXISTS archive (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS items (
+    id TEXT PRIMARY KEY, sort INTEGER NOT NULL, month TEXT NOT NULL,
+    file_state TEXT, file_size INTEGER, data TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS items_sort ON items (sort);
+CREATE TABLE IF NOT EXISTS runs (id INTEGER PRIMARY KEY, data TEXT NOT NULL);
+'''
+
+
+class ArchiveVersionError(Exception):
+    pass
 
 
 def find_export_dir(output: str, username: str, resume: bool) -> str:
@@ -26,155 +38,77 @@ def find_export_dir(output: str, username: str, resume: bool) -> str:
 
 
 def is_export_dir(path: str) -> bool:
-    return os.path.isdir(path) and any(os.path.exists(os.path.join(path, name))
-                                       for name in (RESULT_FILE, 'result_part1.json', JOURNAL_FILE))
+    return os.path.isfile(os.path.join(path, ARCHIVE_FILE))
 
 
-class ExportFolder:
+def dumps(value) -> str:
+    return json.dumps(value, ensure_ascii=False, separators=(',', ':'))
+
+
+class Archive:
     def __init__(self, path: str) -> None:
+        """Opens the archive in the folder at path, creating both when they do not exist."""
         self.path = path
-        self.result_path = os.path.join(path, RESULT_FILE)
-        self.journal_path = os.path.join(path, JOURNAL_FILE)
-        self.state_path = os.path.join(path, STATE_FILE)
+        os.makedirs(path, exist_ok=True)
+        self.db = sqlite3.connect(os.path.join(path, ARCHIVE_FILE))
+        self.db.execute('PRAGMA journal_mode=WAL')
+        self.db.execute('PRAGMA synchronous=NORMAL')
+        self.db.executescript(SCHEMA)
+        version = self.get('version')
+        if version is None:
+            self.set('format', FORMAT)
+            self.set('version', VERSION)
+            self.db.commit()
+        elif self.get('format') != FORMAT or version != VERSION:
+            found = f"{os.path.join(path, ARCHIVE_FILE)} is format {self.get('format')!r} version {version}"
+            self.db.close()
+            raise ArchiveVersionError(f"{found}; this program reads version {VERSION}")
 
-    def part_path(self, number: int) -> str:
-        return os.path.join(self.path, f'result_part{number}.json')
+    def close(self) -> None:
+        self.db.close()
 
-    def create(self) -> None:
-        os.makedirs(self.path, exist_ok=True)
+    def commit(self) -> None:
+        self.db.commit()
 
-    def load(self) -> dict:
-        """The export (chat fields and 'messages'), with the records saved to the journal since it was last written."""
-        data = self.load_result()
-        journal = self.read_journal()
-        if journal:
-            messages = {m['id']: m for m in data.get('messages', [])}
-            messages.update(journal)
-            data['messages'] = [messages[i] for i in sorted(messages)]
-            logger.info(f"📂 Recovered {len(journal):,} messages saved since result.json was last written")
-        return data
+    def get(self, key: str, default=None):
+        row = self.db.execute('SELECT value FROM archive WHERE key = ?', (key,)).fetchone()
+        return json.loads(row[0]) if row else default
 
-    def load_result(self) -> dict:
-        if os.path.exists(self.result_path):
-            try:
-                with open(self.result_path, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                    logger.info(f"📂 Found existing export with {len(data.get('messages', []))} messages")
-                    return data
-            except Exception as e:
-                logger.warning(f"⚠️ Failed to load existing export: {e}")
+    def set(self, key: str, value) -> None:
+        self.db.execute('INSERT OR REPLACE INTO archive (key, value) VALUES (?, ?)', (key, dumps(value)))
 
-        part_num = 1
-        all_messages = []
-        chat_data = {}
-        while os.path.exists(self.part_path(part_num)):
-            try:
-                with open(self.part_path(part_num), 'r', encoding='utf-8') as f:
-                    part_data = json.load(f)
-                    if part_num == 1:
-                        chat_data = part_data.copy()
-                        chat_data['messages'] = []
-                    all_messages.extend(part_data.get('messages', []))
-                part_num += 1
-            except Exception as e:
-                logger.warning(f"⚠️ Failed to load split file {self.part_path(part_num)}: {e}")
-                break
-        if all_messages:
-            chat_data['messages'] = all_messages
-            logger.info(f"📂 Found existing split export with {len(all_messages)} messages from {part_num - 1} parts")
-            return chat_data
-        return {}
+    def put_item(self, record: dict) -> None:
+        status = record.get('file_status') or {}
+        self.db.execute('INSERT OR REPLACE INTO items (id, sort, month, file_state, file_size, data) VALUES (?, ?, ?, ?, ?, ?)',
+                        (str(record['id']), record['id'], record['date'][:7], status.get('state'), status.get('size'),
+                         dumps(record)))
 
-    def read_journal(self) -> dict:
-        # One message record per line; later lines replace earlier ones. A line cut short by a crash is skipped.
-        records = {}
-        try:
-            with open(self.journal_path, encoding='utf-8') as f:
-                for line in f:
-                    try:
-                        record = json.loads(line)
-                    except ValueError:
-                        continue
-                    records[record['id']] = record
-        except FileNotFoundError:
-            pass
-        return records
+    def item(self, item_id) -> dict | None:
+        row = self.db.execute('SELECT data FROM items WHERE id = ?', (str(item_id),)).fetchone()
+        return json.loads(row[0]) if row else None
 
-    def append_journal(self, records: list) -> None:
-        try:
-            with open(self.journal_path, 'rb') as f:
-                f.seek(-1, os.SEEK_END)
-                cut_short = f.read(1) != b'\n'
-        except OSError:
-            cut_short = False
-        with open(self.journal_path, 'a', encoding='utf-8') as f:
-            if cut_short:
-                f.write('\n')
-            for record in records:
-                f.write(json.dumps(record, default=str) + '\n')
-            f.flush()
-            os.fsync(f.fileno())
+    def items(self, newest_first: bool = False, with_files_not_downloaded: bool = False):
+        where = "WHERE file_state IS NOT NULL AND file_state != 'downloaded'" if with_files_not_downloaded else ''
+        order = 'DESC' if newest_first else 'ASC'
+        for (data,) in self.db.execute(f'SELECT data FROM items {where} ORDER BY sort {order}'):
+            yield json.loads(data)
 
-    def remove_journal(self) -> None:
-        if os.path.exists(self.journal_path):
-            os.remove(self.journal_path)
+    def count(self) -> int:
+        return self.db.execute('SELECT COUNT(*) FROM items').fetchone()[0]
 
-    def write_result(self, chat_data: dict, page_size: int | None) -> None:
-        """Writes result.json, or parts of about page_size bytes, and removes the other form."""
-        chat_data['messages'].sort(key=lambda m: m['id'])
-        if page_size:
-            self.write_parts(chat_data, page_size)
-            if os.path.exists(self.result_path):
-                os.remove(self.result_path)
-            return
-        write_json(self.result_path, chat_data, indent=4)
-        self.remove_parts_from(1)
+    def file_states(self) -> dict:
+        rows = self.db.execute('SELECT file_state, COUNT(*), COALESCE(SUM(file_size), 0) FROM items '
+                               'WHERE file_state IS NOT NULL GROUP BY file_state')
+        return {state: {'count': count, 'bytes': size} for state, count, size in rows}
 
-    def write_parts(self, data: dict, page_size: int) -> None:
-        # Every part carries the chat's fields.
-        chat = {key: value for key, value in data.items() if key != 'messages'}
-        base_size = len(json.dumps({**chat, 'messages': []}, indent=4, default=str).encode('utf-8'))
-        parts, current, size = [], [], base_size
-        for msg in data['messages']:
-            text = json.dumps(msg, indent=4, default=str)
-            msg_size = len(text.encode('utf-8')) + 8 * (text.count('\n') + 1) + 2
-            if current and size + msg_size > page_size:
-                parts.append(current)
-                current, size = [], base_size
-            current.append(msg)
-            size += msg_size
-        parts.append(current)
-        for number, messages in enumerate(parts, 1):
-            write_json(self.part_path(number), {**chat, 'messages': messages}, indent=4)
-        self.remove_parts_from(len(parts) + 1)
+    def downloaded_bytes(self) -> int:
+        return self.file_states().get('downloaded', {}).get('bytes', 0)
 
-    def remove_parts_from(self, number: int) -> None:
-        while os.path.exists(self.part_path(number)):
-            os.remove(self.part_path(number))
-            number += 1
+    def start_run(self, run: dict) -> int:
+        return self.db.execute('INSERT INTO runs (data) VALUES (?)', (dumps(run),)).lastrowid
 
-    def load_state(self) -> dict:
-        try:
-            with open(self.state_path, encoding='utf-8') as f:
-                return json.load(f)
-        except FileNotFoundError:
-            return {}
-        except Exception as e:
-            logger.warning(f"⚠️ Failed to read {STATE_FILE}; the history is listed again: {e}")
-            return {}
+    def update_run(self, run_id: int, run: dict) -> None:
+        self.db.execute('UPDATE runs SET data = ? WHERE id = ?', (dumps(run), run_id))
 
-    def write_state(self, state: dict) -> None:
-        write_json(self.state_path, state, indent=2, default=None)
-
-    def updated(self) -> str | None:
-        """When result.json (or its first part) was last written."""
-        path = self.result_path if os.path.exists(self.result_path) else self.part_path(1)
-        if not os.path.exists(path):
-            return None
-        return datetime.fromtimestamp(os.path.getmtime(path)).strftime('%Y-%m-%dT%H:%M:%S')
-
-
-def write_json(path: str, data, indent: int, default=str) -> None:
-    with open(f'{path}.tmp', 'w', encoding='utf-8') as f:
-        json.dump(data, f, indent=indent, default=default)
-    os.replace(f'{path}.tmp', path)
+    def runs(self) -> list:
+        return [json.loads(data) for (data,) in self.db.execute('SELECT data FROM runs ORDER BY id')]

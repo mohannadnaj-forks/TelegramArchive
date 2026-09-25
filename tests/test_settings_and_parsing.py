@@ -18,17 +18,12 @@ class SettingsFromEnvironment(unittest.TestCase):
 
     def test_values(self):
         settings = Settings.from_env({'MEDIA_EXPORT_VOICE_MESSAGES': 'true', 'MEDIA_EXPORT_PHOTOS': 'False',
-                                      'CHAT_EXPORT_SUPER_GROUPS': '1', 'RESUME_ENABLED': 'no',
-                                      'JSON_FILE_PAGE_SIZE': '5000000 # bytes', 'API_ID': '12'})
+                                      'CHAT_EXPORT_SUPER_GROUPS': '1', 'RESUME_ENABLED': 'no', 'API_ID': '12'})
         self.assertTrue(settings.media['voice_messages'])
         self.assertFalse(settings.media['photos'])
         self.assertTrue(settings.chats['super_group'])
         self.assertFalse(settings.resume_enabled)
-        self.assertEqual(settings.json_file_page_size, 5000000)
         self.assertEqual(settings.api_id, '12')
-
-    def test_page_size_none_as_in_env_example(self):
-        self.assertIsNone(Settings.from_env({'JSON_FILE_PAGE_SIZE': 'None # Bytes. None for unlimited'}).json_file_page_size)
 
 
 class Parsing(unittest.TestCase):

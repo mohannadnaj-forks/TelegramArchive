@@ -93,21 +93,14 @@ class ViewerOnly(ViewerRun):
         self.assertEqual(self.viewer_only('https://t.me/testchat'), 0, self.output)
         self.assertEqual(self.index()['total'], 30)
 
-    def test_includes_records_from_the_journal_of_a_killed_run(self):
+    def test_includes_what_a_killed_run_saved(self):
         self.run_bot(count=100, checkpoint_seconds=0, kill_after_listed=40)
-        self.assertFalse(os.path.exists(self.path('result.json')))
         self.assertEqual(self.viewer_only(self.export_dir()), 0, self.output)
         self.assertEqual(self.index()['total'], 40)
-        self.assertIsNone(self.index()['updated'])
-
-    def test_rebuilds_from_parts(self):
-        self.run_bot(env={'JSON_FILE_PAGE_SIZE': 20000})
-        self.assertEqual(self.viewer_only(self.export_dir()), 0, self.output)
-        self.assertEqual(self.index()['total'], 250)
 
     def test_a_chat_without_an_export_is_reported(self):
         self.assertEqual(self.viewer_only('nobody'), 0, self.output)
-        self.assertIn('No result.json under', self.output)
+        self.assertIn('No archive under', self.output)
         self.assertFalse(os.path.exists(self.out))
 
     def test_all_is_refused(self):

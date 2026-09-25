@@ -19,7 +19,6 @@ class FullExport(ExportRun):
         self.assertEqual(self.state()['listed'], [[1, 250]])
         self.assertEqual(self.state()['run']['status'], 'complete')
         self.assertTrue(os.path.exists(os.path.join(self.export_dir(), 'index.html')))
-        self.assertFalse(os.path.exists(os.path.join(self.export_dir(), 'export_journal.jsonl')))
 
     def test_a_later_run_lists_only_new_messages(self):
         self.run_bot(count=200)
@@ -71,38 +70,21 @@ class StoppingDuringListing(ExportRun):
 
 
 class Killed(ExportRun):
-    def journal(self) -> str:
-        return os.path.join(self.export_dir(), 'export_journal.jsonl')
-
-    def test_a_killed_listing_is_recovered_from_the_journal(self):
+    def test_a_killed_listing_keeps_what_it_saved_and_the_next_run_continues(self):
         self.assertEqual(self.run_bot(checkpoint_seconds=0, kill_after_listed=120), 9)
-        self.assertFalse(os.path.exists(os.path.join(self.export_dir(), 'result.json')))
-        with open(self.journal(), encoding='utf-8') as f:
-            saved = [json.loads(line)['id'] for line in f]
-        self.assertEqual(saved, list(range(250, 130, -1)))
+        self.assertEqual([m['id'] for m in self.result()['messages']], list(range(131, 251)))
         self.assertEqual(self.state()['listed'], [[131, 250]])
+        self.assertEqual(self.state()['run']['status'], 'running', 'a killed run never gets to say otherwise')
 
         self.assertEqual(self.run_bot(), 0, self.output)
-        self.assertIn('Recovered 120 messages', self.output)
         self.assertEqual([m['id'] for m in self.result()['messages']], list(range(1, 251)))
         self.assertFalse(set(self.listed_ids()) & set(range(131, 250)))
-        self.assertFalse(os.path.exists(self.journal()))
+        self.assertEqual([r['status'] for r in self.archive()['runs']], ['running', 'complete'])
 
-    def test_a_line_cut_short_by_a_crash_is_ignored(self):
-        self.run_bot(checkpoint_seconds=0, kill_after_listed=50)
-        with open(self.journal(), 'a', encoding='utf-8') as f:
-            f.write('{"id": 1, "type": "mess')
-        self.assertEqual(self.run_bot(), 0, self.output)
-        self.assertEqual([m['id'] for m in self.result()['messages']], list(range(1, 251)))
-
-    def test_records_saved_after_a_line_cut_short_survive_a_second_kill(self):
-        self.run_bot(checkpoint_seconds=0, kill_after_listed=50)
-        with open(self.journal(), 'a', encoding='utf-8') as f:
-            f.write('{"id": 1, "type": "mess')
-        self.assertEqual(self.run_bot(checkpoint_seconds=0, kill_after_listed=31), 9)
-        self.assertEqual(self.state()['listed'], [[171, 250]])
-        self.assertEqual(self.run_bot(), 0, self.output)
-        self.assertEqual([m['id'] for m in self.result()['messages']], list(range(1, 251)))
+    def test_a_kill_loses_only_what_was_not_saved_yet(self):
+        self.assertEqual(self.run_bot(kill_after_listed=120, clock=lambda: 0), 9)
+        self.assertEqual(self.result()['messages'], [])
+        self.assertEqual(self.archive()['runs'], [])
 
 
 class StoppingDuringDownloads(ExportRun):
@@ -139,14 +121,6 @@ class SizeLimits(ExportRun):
         self.assertEqual(self.file_states(), {'downloaded': 83 + 34})
         self.assertEqual(len(self.calls('history')), 1)
 
-
-class OlderExports(ExportRun):
-    def test_an_export_without_state_is_listed_again_and_keeps_its_files(self):
-        self.run_bot(count=100)
-        os.remove(os.path.join(self.export_dir(), 'export_state.json'))
-        self.assertEqual(self.run_bot(count=100), 0, self.output)
-        self.assertEqual(self.listed_ids(), list(range(100, 0, -1)))
-        self.assertEqual(self.calls('download'), [])
 
 
 class DateRanges(ExportRun):

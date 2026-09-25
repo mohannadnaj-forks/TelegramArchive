@@ -1,11 +1,11 @@
-"""The export folder on disk (telegram_archive.store)."""
-import json
+"""The archive on disk (telegram_archive.store)."""
 import os
 import shutil
+import sqlite3
 import tempfile
 import unittest
 
-from telegram_archive.store import ExportFolder, find_export_dir, is_export_dir
+from telegram_archive.store import Archive, ArchiveVersionError, find_export_dir, is_export_dir
 
 
 class Folders(unittest.TestCase):
@@ -38,70 +38,67 @@ class Folders(unittest.TestCase):
 class Saving(unittest.TestCase):
     def setUp(self):
         self.dir = tempfile.mkdtemp(prefix='telegram-archive-test-')
-        self.folder = ExportFolder(self.dir)
+        self.archive = Archive(self.dir)
 
     def tearDown(self):
+        self.archive.close()
         shutil.rmtree(self.dir, ignore_errors=True)
 
-    def chat(self, count):
-        return {'name': 'Test', 'messages': [{'id': i, 'text': 'x' * 50} for i in range(count, 0, -1)]}
+    def reopen(self) -> Archive:
+        self.archive.close()
+        self.archive = Archive(self.dir)
+        return self.archive
 
-    def test_an_empty_folder_holds_no_export(self):
-        self.assertEqual(self.folder.load(), {})
-        self.assertFalse(is_export_dir(self.dir))
-        self.assertIsNone(self.folder.updated())
+    def record(self, i, state=None, size=None, **fields):
+        status = {'file_status': {'state': state, 'size': size}} if state else {}
+        return {'id': i, 'date': '2024-01-02T10:00:00', **status, **fields}
 
-    def test_result_json_is_sorted_and_read_back(self):
-        self.folder.write_result(self.chat(5), None)
-        self.assertEqual(sorted(os.listdir(self.dir)), ['result.json'])
-        self.assertEqual([m['id'] for m in self.folder.load()['messages']], [1, 2, 3, 4, 5])
+    def test_a_new_archive_says_what_it_is(self):
         self.assertTrue(is_export_dir(self.dir))
+        self.assertEqual((self.archive.get('format'), self.archive.get('version')), ('archive', 1))
+        self.assertEqual(self.archive.count(), 0)
 
-    def test_parts_and_back(self):
-        self.folder.write_result(self.chat(100), 2000)
-        names = sorted(os.listdir(self.dir))
-        self.assertNotIn('result.json', names)
-        self.assertGreater(len(names), 2)
-        loaded = self.folder.load()
-        self.assertEqual(loaded['name'], 'Test')
-        self.assertEqual([m['id'] for m in loaded['messages']], list(range(1, 101)))
-        self.folder.write_result(self.chat(100), None)
-        self.assertEqual(os.listdir(self.dir), ['result.json'])
+    def test_only_committed_changes_are_kept(self):
+        self.archive.put_item(self.record(1))
+        self.archive.commit()
+        self.archive.put_item(self.record(2))
+        self.assertEqual([r['id'] for r in self.reopen().items()], [1])
 
-    def test_the_journal_adds_to_and_replaces_records(self):
-        self.folder.write_result(self.chat(3), None)
-        self.folder.append_journal([{'id': 2, 'text': 'edited'}, {'id': 4, 'text': 'new'}])
-        self.folder.append_journal([{'id': 4, 'text': 'newer'}])
-        records = {m['id']: m['text'] for m in self.folder.load()['messages']}
-        self.assertEqual(records, {1: 'x' * 50, 2: 'edited', 3: 'x' * 50, 4: 'newer'})
-        self.folder.remove_journal()
-        self.assertEqual(len(self.folder.load()['messages']), 3)
+    def test_items_are_replaced_by_id_and_read_in_id_order(self):
+        for i in (9, 7, 2):
+            self.archive.put_item(self.record(i))
+        self.archive.put_item(self.record(7, text='edited'))
+        self.assertEqual([r['id'] for r in self.archive.items()], [2, 7, 9])
+        self.assertEqual([r['id'] for r in self.archive.items(newest_first=True)], [9, 7, 2])
+        self.assertEqual(self.archive.item(7)['text'], 'edited')
+        self.assertIsNone(self.archive.item(8))
 
-    def test_records_from_the_journal_are_in_id_order(self):
-        self.folder.write_result(self.chat(3), None)
-        self.folder.append_journal([{'id': 9}, {'id': 7}, {'id': 2, 'text': 'edited'}])
-        self.assertEqual([m['id'] for m in self.folder.load()['messages']], [1, 2, 3, 7, 9])
+    def test_files_are_counted_by_state(self):
+        self.archive.put_item(self.record(1, 'downloaded', 10))
+        self.archive.put_item(self.record(2, 'downloaded', 5))
+        self.archive.put_item(self.record(3, 'pending', 7))
+        self.archive.put_item(self.record(4))
+        self.assertEqual(self.archive.file_states(), {'downloaded': {'count': 2, 'bytes': 15},
+                                                      'pending': {'count': 1, 'bytes': 7}})
+        self.assertEqual(self.archive.downloaded_bytes(), 15)
+        self.assertEqual([r['id'] for r in self.archive.items(with_files_not_downloaded=True)], [3])
 
-    def test_a_line_cut_short_is_skipped_and_the_next_append_starts_a_new_line(self):
-        self.folder.append_journal([{'id': 1}])
-        with open(self.folder.journal_path, 'a', encoding='utf-8') as f:
-            f.write('{"id": 2, "te')
-        self.folder.append_journal([{'id': 3}])
-        self.assertEqual(sorted(self.folder.read_journal()), [1, 3])
+    def test_values_and_runs(self):
+        self.archive.set('account', {'name': 'Test'})
+        run = self.archive.start_run({'status': 'running'})
+        self.archive.update_run(run, {'status': 'complete'})
+        self.archive.commit()
+        self.assertEqual(self.reopen().get('account'), {'name': 'Test'})
+        self.assertEqual(self.archive.runs(), [{'status': 'complete'}])
 
-    def test_state_round_trip_and_an_unreadable_state(self):
-        self.folder.write_state({'listed': [[1, 5]]})
-        self.assertEqual(self.folder.load_state(), {'listed': [[1, 5]]})
-        with open(self.folder.state_path, 'w', encoding='utf-8') as f:
-            f.write('{broken')
-        self.assertEqual(self.folder.load_state(), {})
-
-    def test_writes_leave_no_temporary_files(self):
-        self.folder.write_result(self.chat(3), None)
-        self.folder.write_state({})
-        self.assertEqual(sorted(os.listdir(self.dir)), ['export_state.json', 'result.json'])
-        with open(os.path.join(self.dir, 'result.json'), encoding='utf-8') as f:
-            self.assertEqual(json.load(f)['name'], 'Test')
+    def test_an_archive_of_another_version_is_refused(self):
+        self.archive.close()
+        db = sqlite3.connect(os.path.join(self.dir, 'archive.db'))
+        db.execute("UPDATE archive SET value = '2' WHERE key = 'version'")
+        db.commit()
+        db.close()
+        with self.assertRaisesRegex(ArchiveVersionError, 'version 2; this program reads version 1'):
+            Archive(self.dir)
 
 
 if __name__ == '__main__':

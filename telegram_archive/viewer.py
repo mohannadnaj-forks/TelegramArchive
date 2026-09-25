@@ -3,7 +3,7 @@ import json
 import logging
 import os
 
-from .store import ExportFolder
+from .store import Archive
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +82,7 @@ def viewer_index(chat_data: dict, updated: str | None) -> tuple:
     return index, chunks, search
 
 
-def generate_index_html(export_path: str, chat_data: dict, template_path: str = TEMPLATE) -> None:
+def generate_index_html(export_path: str, archive: Archive, template_path: str = TEMPLATE) -> None:
     """Writes index.html and its data/ folder for viewing the exported chat."""
     try:
         with open(template_path, 'r', encoding='utf-8') as f:
@@ -91,7 +91,9 @@ def generate_index_html(export_path: str, chat_data: dict, template_path: str = 
         logger.error(f"❌ HTML template not found: {template_path}")
         return
 
-    index, chunks, search = viewer_index(chat_data, ExportFolder(export_path).updated())
+    runs = archive.runs()
+    chat_data = {**archive.get('account', {}), 'messages': list(archive.items())}
+    index, chunks, search = viewer_index(chat_data, runs[-1].get('updated') if runs else None)
     data_dir = os.path.join(export_path, 'data')
     files = {f'{name}.js': f'archiveChunk({compact_js(name)},{compact_js(part)});\n' for name, part in chunks.items()}
     files['search.js'] = f'archiveSearch({compact_js(search)});\n'
