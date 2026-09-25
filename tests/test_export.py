@@ -3,7 +3,6 @@
 The fake chat's messages are numbered 1..count, one hour apart; every third has a photo and every
 fifth a video. test_end_to_end.py repeats the Ctrl-C and kill cases in a real subprocess.
 """
-import json
 import os
 import unittest
 
