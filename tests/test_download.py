@@ -17,9 +17,10 @@ from telegram_archive.settings import Settings
 class ScriptedClient:
     """download_media follows a script, one entry per attempt: 'ok', 'zero', a number (a FloodWait) or an exception."""
 
-    def __init__(self, script):
+    def __init__(self, script, total=3 * 1024 ** 2):
         self.script = list(script)
         self.attempts = 0
+        self.total = total
 
     async def download_media(self, file_id, file_name, progress=None, progress_args=()):
         self.attempts += 1
@@ -34,7 +35,7 @@ class ScriptedClient:
         for current in (1, 2, 3):
             if progress is None:
                 continue
-            args = (current * 1024 ** 2, 3 * 1024 ** 2, *progress_args)
+            args = (current * 1024 ** 2, self.total, *progress_args)
             if inspect.iscoroutinefunction(progress):
                 await progress(*args)
             else:
@@ -60,16 +61,16 @@ class Downloads(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.dir, ignore_errors=True)
 
-    def fetch(self, script, free=10 ** 12, attempts=None, heartbeat=None, **settings):
+    def fetch(self, script, free=10 ** 12, attempts=None, heartbeat=None, size=0, total=3 * 1024 ** 2, **settings):
         async def sleep(seconds):
             self.waits.append(seconds)
 
         ticks = iter(range(0, 10 ** 6, 10))
-        self.client = ScriptedClient(script)
+        self.client = ScriptedClient(script, total)
         self.progress = NoProgress()
         downloader = Downloader(self.client, Settings(**settings), sleep=sleep, free_bytes=lambda path: free,
                                 clock=lambda: next(ticks))
-        return asyncio.run(downloader.fetch('video:1', self.destination, self.progress, attempts, heartbeat))
+        return asyncio.run(downloader.fetch('video:1', self.destination, self.progress, attempts, heartbeat, size))
 
     def test_a_file_on_disk_is_not_fetched(self):
         open(self.destination, 'w').close()
@@ -123,6 +124,13 @@ class Downloads(unittest.TestCase):
         self.assertEqual(self.fetch(['ok'], heartbeat=lambda: beats.append(1)), (True, None))
         self.assertEqual(len(beats), 3)
         self.assertIn({'file': 'video_1.mp4', 'status': '1/3 MB, 0.1 MB/s'}, self.progress.postfixes)
+
+    def test_progress_falls_back_to_the_expected_size_when_the_library_reports_none(self):
+        self.assertEqual(self.fetch(['ok'], total=0, size=4 * 1024 ** 2), (True, None))
+        self.assertIn({'file': 'video_1.mp4', 'status': '1/4 MB, 0.1 MB/s'}, self.progress.postfixes)
+        os.remove(self.destination)
+        self.assertEqual(self.fetch(['ok'], total=0), (True, None))
+        self.assertIn({'file': 'video_1.mp4', 'status': '1 MB, 0.1 MB/s'}, self.progress.postfixes)
 
     def test_low_disk_space_stops_before_downloading(self):
         with self.assertRaises(LowDiskSpace):

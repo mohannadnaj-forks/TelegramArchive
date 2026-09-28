@@ -44,7 +44,8 @@ class LastWarning(logging.Handler):
 
 def format_progress(current: int, total: int, seconds: float) -> str:
     mb = 1024 ** 2
-    return f"{current / mb:,.0f}/{total / mb:,.0f} MB, {current / mb / max(seconds, 0.001):.1f} MB/s"
+    done = f"{current / mb:,.0f}/{total / mb:,.0f} MB" if total else f"{current / mb:,.0f} MB"
+    return f"{done}, {current / mb / max(seconds, 0.001):.1f} MB/s"
 
 
 class Downloader:
@@ -57,11 +58,12 @@ class Downloader:
         self.last_reason = None
 
     async def fetch(self, file_id: str, destination: str, pbar, attempts: int | None = None,
-                    heartbeat=None) -> tuple[bool, str | None]:
+                    heartbeat=None, size: int = 0) -> tuple[bool, str | None]:
         """Downloads file_id to destination unless it is there. Returns (ok, the last error).
 
-        attempts overrides DOWNLOAD_MAX_RETRIES; heartbeat is called as the file's bytes arrive.
-        FileReferenceExpired is raised at once: retrying the same reference cannot succeed."""
+        attempts overrides DOWNLOAD_MAX_RETRIES; heartbeat is called as the file's bytes arrive; size is
+        the expected size, shown when the library reports none. FileReferenceExpired is raised at once:
+        retrying the same reference cannot succeed."""
         if os.path.exists(destination):
             return True, None
 
@@ -80,7 +82,7 @@ class Downloader:
         for attempt in range(1, max_attempts + 1):
             try:
                 pbar.set_postfix(file=name, status=f"Downloading... (attempt {attempt})")
-                await self.download(file_id, temp_destination, name, pbar, heartbeat)
+                await self.download(file_id, temp_destination, name, pbar, heartbeat, size)
 
                 if os.path.exists(temp_destination) and os.path.getsize(temp_destination) > 0:
                     files.replace(temp_destination, destination)
@@ -142,7 +144,7 @@ class Downloader:
         pbar.set_postfix(file=name, status="Download failed ❌")
         return False, last_error
 
-    async def download(self, file_id: str, temp_destination: str, name: str, pbar, heartbeat) -> None:
+    async def download(self, file_id: str, temp_destination: str, name: str, pbar, heartbeat, size: int) -> None:
         """One attempt; last_reason is the error behind a failure, which the library logs but does not raise."""
         started = last_shown = self.clock()
 
@@ -151,7 +153,7 @@ class Downloader:
             nonlocal last_shown
             now = self.clock()
             if now - last_shown >= PROGRESS_SECONDS:
-                pbar.set_postfix(file=name, status=format_progress(current, total, now - started))
+                pbar.set_postfix(file=name, status=format_progress(current, total or size, now - started))
                 last_shown = now
             if heartbeat is not None:
                 heartbeat()

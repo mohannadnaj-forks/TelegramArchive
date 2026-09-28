@@ -304,7 +304,7 @@ class ChatExport:
                 return
             os.makedirs(os.path.dirname(path), exist_ok=True)
             attempts = 1 if medium.get('failures', 0) >= FAILED_RUNS_BEFORE_ONE_ATTEMPT else None
-            ok, error = await self.fetch(message, media, path, pbar, attempts)
+            ok, error = await self.fetch(message, media, path, pbar, attempts, size)
             if not ok:
                 states.set_state(medium, states.failed(error))
                 medium['failures'] = medium.get('failures', 0) + 1
@@ -318,10 +318,10 @@ class ChatExport:
                 await self.downloader.fetch(thumb_id, thumbnail, pbar, THUMBNAIL_ATTEMPTS, self.save)
         self.mark_downloaded(medium, item)
 
-    async def fetch(self, message, media, path: str, pbar, attempts: int | None = None) -> tuple[bool, str | None]:
+    async def fetch(self, message, media, path: str, pbar, attempts: int | None = None, size: int = 0) -> tuple[bool, str | None]:
         """Downloads the file; when its reference has expired, fetches the message again, once."""
         try:
-            return await self.downloader.fetch(media.file_id, path, pbar, attempts, self.save)
+            return await self.downloader.fetch(media.file_id, path, pbar, attempts, self.save, size)
         except FileReferenceExpired as e:
             error = str(e)
         [fresh] = await self.get_messages([message.id])
@@ -329,7 +329,7 @@ class ChatExport:
         if not found:
             return False, error
         try:
-            return await self.downloader.fetch(found[1].file_id, path, pbar, attempts, self.save)
+            return await self.downloader.fetch(found[1].file_id, path, pbar, attempts, self.save, size)
         except FileReferenceExpired as e:
             return False, str(e)
 
