@@ -200,8 +200,13 @@ def run(argv: list, env: Mapping[str, str], client_factory=create_client, sessio
         signal.signal(signal.SIGINT, previous_handler)
 
 
+def configure_streams() -> None:
+    """UTF-8 output, written line by line also when redirected to a file."""
+    for stream in (sys.stdout, sys.stderr):
+        stream.reconfigure(encoding='utf-8', errors='replace', line_buffering=True)
+
+
 def main() -> None:
     load_dotenv()
-    for stream in (sys.stdout, sys.stderr):
-        stream.reconfigure(encoding='utf-8', errors='replace')
+    configure_streams()
     run(sys.argv[1:], os.environ)

@@ -57,6 +57,13 @@ class DownloadRetries(ExportRun):
         self.assertEqual(self.status_of(250)['state'], 'downloaded')
         self.assertNotIn('failures', self.medium(250))
 
+    def test_the_failure_count_survives_a_refresh(self):
+        for _ in (1, 2):
+            self.assertEqual(self.run_bot(download_errors={VIDEO: ['network'] * 5}), 0, self.output)
+        self.assertEqual(self.run_bot('--refresh', download_errors={VIDEO: ['network'] * 5}), 0, self.output)
+        self.assertEqual(self.attempts(VIDEO), [1])
+        self.assertEqual(self.medium(250)['failures'], 3)
+
     def test_a_thumbnail_gets_two_attempts_and_the_file_stays_downloaded(self):
         self.assertEqual(self.run_bot(download_errors={'249.thumb.jpg': ['network'] * 5}), 0, self.output)
         self.assertEqual(self.attempts('249.thumb.jpg'), [1, 2])

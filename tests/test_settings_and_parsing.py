@@ -4,8 +4,9 @@ import io
 import logging
 import unittest
 from datetime import datetime
+from unittest import mock
 
-from telegram_archive.cli import library_handler, parse_chat, parse_date, parse_size
+from telegram_archive.cli import configure_streams, library_handler, parse_chat, parse_date, parse_size
 from telegram_archive.export import format_size, merge_ranges
 from telegram_archive.settings import Settings
 from telegram_archive.telegram import api_chat_id
@@ -55,6 +56,14 @@ class Parsing(unittest.TestCase):
         self.assertEqual(api_chat_id(-1001234), -1001234)
         self.assertEqual(api_chat_id(-555), -555)
         self.assertEqual(api_chat_id('durov'), 'durov')
+
+
+class OutputStreams(unittest.TestCase):
+    def test_output_is_utf8_and_line_buffered_when_redirected(self):
+        out, err = (io.TextIOWrapper(io.BytesIO(), encoding='cp1252') for _ in range(2))
+        with mock.patch('sys.stdout', out), mock.patch('sys.stderr', err):
+            configure_streams()
+        self.assertEqual((out.encoding, out.line_buffering, err.encoding, err.line_buffering), ('utf-8', True, 'utf-8', True))
 
 
 class LibraryLogging(unittest.TestCase):

@@ -276,6 +276,8 @@ class ChatExport:
             states.set_state(medium, states.before_download(medium.get('size') or 0, self.settings.media[kind.setting],
                                                             media_setting_name(kind.setting), self.options.max_file_size)
                              or states.pending())
+            if known and known.get('failures'):
+                medium['failures'] = known['failures']
         return medium
 
     def thumbnail_of(self, medium: dict, item: dict) -> str:
