@@ -6,6 +6,7 @@ import shutil
 
 from pyrogram.errors import FileReferenceExpired, FloodWait
 
+from . import files
 from .settings import Settings
 
 logger = logging.getLogger(__name__)
@@ -56,7 +57,7 @@ class Downloader:
                     pyrogram_logger.setLevel(original_level)
 
                 if os.path.exists(temp_destination) and os.path.getsize(temp_destination) > 0:
-                    os.replace(temp_destination, destination)
+                    files.replace(temp_destination, destination)
                     file_size = os.path.getsize(destination)
                     logger.info(f"✅ Downloaded: {os.path.basename(destination)} ({file_size:,} bytes)")
                     pbar.set_postfix(status="Downloaded ✅")

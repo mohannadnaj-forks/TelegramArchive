@@ -4,6 +4,7 @@ import json
 import logging
 import os
 
+from . import files
 from .store import FORMAT, VERSION, Archive
 
 logger = logging.getLogger(__name__)
@@ -93,7 +94,7 @@ def generate_index_html(export_path: str, archive: Archive, template_path: str =
             path = os.path.join(data_dir, *name.split('/'))
             with open(f'{path}.tmp', 'w', encoding='utf-8') as f:
                 f.write(content)
-            os.replace(f'{path}.tmp', path)
+            files.replace(f'{path}.tmp', path)
             written.add(os.path.normpath(path))
         for folder, _, names in os.walk(data_dir):
             for name in names:
