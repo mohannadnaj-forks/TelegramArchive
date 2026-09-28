@@ -15,6 +15,9 @@ class DownloadRetries(ExportRun):
     def status_of(self, message_id: int) -> dict:
         return {k: v for k, v in self.medium(message_id).items() if k in ('state', 'error', 'limit', 'setting')}
 
+    def attempts(self, name: str) -> list:
+        return [c['attempt'] for c in self.calls('download') if c['path'] == name]
+
     def test_a_flood_wait_is_waited_out_and_the_download_retried(self):
         self.assertEqual(self.run_bot(download_errors={VIDEO: ['flood:30']}), 0, self.output)
         self.assertEqual(self.status_of(250)['state'], 'downloaded')
@@ -41,6 +44,24 @@ class DownloadRetries(ExportRun):
         self.assertEqual(self.status_of(250), {'state': 'failed', 'error': 'network went away'})
         self.assertEqual(self.sleeps(), [2, 4, 8, 16])
         self.assertEqual(self.medium(250)['path'], 'media/2024-01/250.mp4', 'the path stays where the file will go')
+
+    def test_a_file_that_failed_in_two_runs_gets_one_attempt_per_run(self):
+        for run in (1, 2):
+            self.assertEqual(self.run_bot(download_errors={VIDEO: ['network'] * 5}), 0, self.output)
+            self.assertEqual(self.medium(250)['failures'], run)
+            self.assertEqual(self.attempts(VIDEO), [1, 2, 3, 4, 5])
+        self.assertEqual(self.run_bot(download_errors={VIDEO: ['network'] * 5}), 0, self.output)
+        self.assertEqual(self.attempts(VIDEO), [1])
+        self.assertEqual(self.medium(250)['failures'], 3)
+        self.assertEqual(self.run_bot(), 0, self.output)
+        self.assertEqual(self.status_of(250)['state'], 'downloaded')
+        self.assertNotIn('failures', self.medium(250))
+
+    def test_a_thumbnail_gets_two_attempts_and_the_file_stays_downloaded(self):
+        self.assertEqual(self.run_bot(download_errors={'249.thumb.jpg': ['network'] * 5}), 0, self.output)
+        self.assertEqual(self.attempts('249.thumb.jpg'), [1, 2])
+        self.assertEqual(self.status_of(249)['state'], 'downloaded')
+        self.assertNotIn('thumbnail', self.medium(249))
 
     def test_an_error_that_clears_up_costs_one_wait(self):
         self.assertEqual(self.run_bot(download_errors={VIDEO: ['network']}), 0, self.output)

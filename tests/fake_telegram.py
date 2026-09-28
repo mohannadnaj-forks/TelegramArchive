@@ -315,7 +315,7 @@ def make_fake_client(scenario: dict, kill=lambda: os._exit(9)) -> type:
             present = set(ids) - gone_later
             return [make_message(i, fetch=True) if i in present else SimpleNamespace(id=i, empty=True) for i in message_ids]
 
-        async def download_media(self, file_id, file_name):
+        async def download_media(self, file_id, file_name, progress=None, progress_args=()):
             name = os.path.basename(file_name).removesuffix('.tmp')
             attempt = counters['attempts'][name] = counters['attempts'].get(name, 0) + 1
             log({'call': 'download', 'path': name, 'attempt': attempt})
@@ -328,8 +328,11 @@ def make_fake_client(scenario: dict, kill=lambda: os._exit(9)) -> type:
                 return file_name
             if action:
                 fail(action)
+            size = size_of(file_id) if not file_id.startswith('chatphoto') else 50
             with open(file_name, 'wb') as f:
-                f.write(b'x' * (size_of(file_id) if not file_id.startswith('chatphoto') else 50))
+                f.write(b'x' * size)
+            if progress is not None:
+                progress(size, size, *progress_args)
             counters['downloads'] += 1
             if counters['downloads'] == scenario.get('interrupt_after_downloads'):
                 signal.raise_signal(signal.SIGINT)

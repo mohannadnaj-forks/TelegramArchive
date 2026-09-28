@@ -20,6 +20,8 @@ logger = logging.getLogger(__name__)
 
 FILE_REFERENCE_CHUNK = 100
 FILE_REFERENCE_MAX_AGE = 1800
+FAILED_RUNS_BEFORE_ONE_ATTEMPT = 2
+THUMBNAIL_ATTEMPTS = 2
 ACCOUNT_PHOTO = 'account/photo.jpg'
 
 
@@ -281,6 +283,7 @@ class ChatExport:
 
     def mark_downloaded(self, medium: dict, item: dict) -> None:
         states.set_state(medium, states.downloaded())
+        medium.pop('failures', None)
         if not medium.get('size'):
             medium['size'] = os.path.getsize(self.full_path(medium['path']))
         thumbnail = self.thumbnail_of(medium, item)
@@ -300,11 +303,11 @@ class ChatExport:
                 self.left_out += 1
                 return
             os.makedirs(os.path.dirname(path), exist_ok=True)
-            pbar.set_postfix(file=os.path.basename(path))
-            ok, error = await self.fetch(message, media, path, pbar)
-            pbar.set_postfix(file=None)
+            attempts = 1 if medium.get('failures', 0) >= FAILED_RUNS_BEFORE_ONE_ATTEMPT else None
+            ok, error = await self.fetch(message, media, path, pbar, attempts)
             if not ok:
                 states.set_state(medium, states.failed(error))
+                medium['failures'] = medium.get('failures', 0) + 1
                 return
             self.downloaded_total += size or os.path.getsize(path)
         thumbnail = self.full_path(self.thumbnail_of(medium, item))
@@ -312,13 +315,13 @@ class ChatExport:
         if not os.path.exists(thumbnail) and (thumbs or kind.kind == 'photo'):
             thumb_id = photo_size_id(media.file_id, 'm') if kind.kind == 'photo' else thumbs[0].file_id
             with contextlib.suppress(FileReferenceExpired):
-                await self.downloader.fetch(thumb_id, thumbnail, pbar)
+                await self.downloader.fetch(thumb_id, thumbnail, pbar, THUMBNAIL_ATTEMPTS, self.save)
         self.mark_downloaded(medium, item)
 
-    async def fetch(self, message, media, path: str, pbar) -> tuple[bool, str | None]:
+    async def fetch(self, message, media, path: str, pbar, attempts: int | None = None) -> tuple[bool, str | None]:
         """Downloads the file; when its reference has expired, fetches the message again, once."""
         try:
-            return await self.downloader.fetch(media.file_id, path, pbar)
+            return await self.downloader.fetch(media.file_id, path, pbar, attempts, self.save)
         except FileReferenceExpired as e:
             error = str(e)
         [fresh] = await self.get_messages([message.id])
@@ -326,7 +329,7 @@ class ChatExport:
         if not found:
             return False, error
         try:
-            return await self.downloader.fetch(found[1].file_id, path, pbar)
+            return await self.downloader.fetch(found[1].file_id, path, pbar, attempts, self.save)
         except FileReferenceExpired as e:
             return False, str(e)
 

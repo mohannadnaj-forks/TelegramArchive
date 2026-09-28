@@ -89,7 +89,9 @@ raising a limit, switching a media type on, or a failed download is fixed by run
 The archive records for each file whether it was downloaded and, if not, why (`disabled`,
 `too_large`, `total_limit`, `failed`, or `unavailable` for a message deleted before its file
 was fetched).
-A run first lists the messages, newest first, then downloads their files, newest first.
+A run first lists the messages, newest first, then downloads their files, newest first. A file
+being downloaded is `<its name>.tmp` next to where it will end up; the progress line shows the
+bytes and speed of a large one.
 Ctrl-C stops after the current message and saves progress, in either pass; the next run
 continues where it stopped, without listing again what was already listed. The run also
 stops with progress saved when free disk space falls below `MIN_FREE_DISK_MB`.
