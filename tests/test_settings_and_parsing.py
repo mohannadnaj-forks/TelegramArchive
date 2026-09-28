@@ -1,9 +1,11 @@
 """Settings from the environment, and parsing of the command line's values."""
 import argparse
+import io
+import logging
 import unittest
 from datetime import datetime
 
-from telegram_archive.cli import parse_chat, parse_date, parse_size
+from telegram_archive.cli import library_handler, parse_chat, parse_date, parse_size
 from telegram_archive.export import format_size, merge_ranges
 from telegram_archive.settings import Settings
 from telegram_archive.telegram import api_chat_id
@@ -53,6 +55,23 @@ class Parsing(unittest.TestCase):
         self.assertEqual(api_chat_id(-1001234), -1001234)
         self.assertEqual(api_chat_id(-555), -555)
         self.assertEqual(api_chat_id('durov'), 'durov')
+
+
+class LibraryLogging(unittest.TestCase):
+    def test_errors_are_printed_except_the_send_failure_at_disconnect(self):
+        stream = io.StringIO()
+        handler = library_handler(stream)
+        log = logging.getLogger('pyrogram.test.tcp')
+        log.propagate = False
+        log.addHandler(handler)
+        try:
+            log.error('Send failed: ConnectionResetError Connection lost')
+            log.warning('[1] Retrying "upload.GetFile" due to: Request timed out')
+            log.error('Server sent transport error: 404 (auth key not found)')
+        finally:
+            log.removeHandler(handler)
+        self.assertEqual(stream.getvalue().count('\n'), 1)
+        self.assertIn('transport error', stream.getvalue())
 
 
 class Helpers(unittest.TestCase):

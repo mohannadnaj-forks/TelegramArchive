@@ -22,6 +22,7 @@ from .viewer import generate_index_html
 
 PROGRAM_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SESSION_DIR = os.path.join(PROGRAM_DIR, '.telegram')
+LOG_FORMAT, LOG_DATE_FORMAT = "%(asctime)s - %(message)s", '%Y-%m-%d %H:%M:%S'
 
 
 def parse_size(value: str) -> int:
@@ -50,7 +51,7 @@ def parse_chat(value: str):
 
 
 def build_parser(download_path: str | None) -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Export Telegram chats to JSON, media files and an HTML viewer.")
+    parser = argparse.ArgumentParser(description="Archive Telegram chats: messages in archive.db, media files and an HTML viewer.")
     parser.add_argument('chats', nargs='*', help="usernames, t.me links or numeric ids; 'me' is Saved Messages")
     parser.add_argument('--all', action='store_true', help="export every chat allowed by the CHAT_EXPORT_* settings")
     parser.add_argument('-o', '--output', default=download_path or 'exports', help="directory to export into (default: DOWNLOAD_PATH from .env, else ./exports)")
@@ -114,11 +115,23 @@ def session_lock(session_dir: str):
         yield
 
 
+def library_handler(stream=None) -> logging.Handler:
+    """Prints the Telegram library's errors, except the send failure it logs while disconnecting."""
+    handler = logging.StreamHandler(stream)
+    handler.setLevel(logging.ERROR)
+    handler.setFormatter(logging.Formatter(LOG_FORMAT, LOG_DATE_FORMAT))
+    handler.addFilter(lambda record: not record.getMessage().startswith('Send failed'))
+    return handler
+
+
 def configure_logging() -> None:
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(message)s", datefmt='%Y-%m-%d %H:%M:%S')
+    logging.basicConfig(level=logging.INFO, format=LOG_FORMAT, datefmt=LOG_DATE_FORMAT)
     for name in ("telethon", "httpx", "pyrogram", "urllib3"):
         logging.getLogger(name).setLevel(logging.ERROR)
         logging.getLogger(name).propagate = False
+    library = logging.getLogger("pyrogram")
+    if not library.handlers:
+        library.addHandler(library_handler())
 
 
 async def export_chats(client, chats: list, export_all: bool, settings: Settings, options: RunOptions,
