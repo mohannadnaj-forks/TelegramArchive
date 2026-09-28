@@ -59,7 +59,7 @@ or directly:
 |---|---|---|
 | `--since`, `--until` `YYYY-MM-DD` | whole history | Only messages in this range, both days included. Ranges exported at different times merge into the same export. |
 | `--max-file-size SIZE` | `200M` | Files larger than this are left out and marked as such in the archive. |
-| `--max-total-size SIZE` | `10G` | Files that would take a chat's media past this are left out, starting from the oldest; the rest of the export completes. Run again with a larger value to fetch them. |
+| `--max-total-size SIZE` | `10G` | How much one run downloads at most. The oldest files beyond it are left out and marked as such; the next run continues with them, newest first. |
 | `--refresh` | off | Re-read the whole history. Without it, a run lists only messages it has not listed before, so edits to older messages are not picked up. |
 
 Sizes take `K`, `M`, `G` suffixes; `0` means no limit. With make, pass these through `ARGS="..."`.

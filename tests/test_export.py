@@ -121,6 +121,17 @@ class SizeLimits(ExportRun):
         self.assertEqual(self.file_states(), {'downloaded': 83 + 34})
         self.assertEqual(len(self.calls('history')), 1)
 
+    def test_the_total_size_limit_is_a_budget_for_each_run(self):
+        self.assertEqual(self.run_bot('--max-total-size', '20K'), 0, self.output)
+        first = self.file_states()['downloaded']
+        self.assertEqual(self.run_bot('--max-total-size', '20K'), 0, self.output)
+        second = self.file_states()['downloaded']
+        self.assertGreater(second, first)
+        self.assertLess(second, 83 + 34)
+        self.assertIn('files to download', self.output)
+        self.assertEqual(self.run_bot('--max-total-size', '20K'), 0, self.output)
+        self.assertGreater(self.file_states()['downloaded'], second)
+
 
 
 class DateRanges(ExportRun):

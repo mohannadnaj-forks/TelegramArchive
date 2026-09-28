@@ -335,9 +335,9 @@ class ChatExport:
                                 self.options.since, self.options.until)
 
     async def download_media(self) -> None:
+        """Downloads the wanted files, newest first; --max-total-size bounds this run's downloads."""
         options = self.options
-        self.downloaded_total = self.archive.downloaded_bytes()
-        planned, left_out, planned_bytes = [], [], self.downloaded_total
+        planned, left_out, planned_bytes = [], [], 0
         for item_id, position, date, medium in self.archive.media_not_downloaded():
             if not self.wanted(medium, date):
                 continue
@@ -354,7 +354,7 @@ class ChatExport:
         if not planned:
             return
         free = self.downloader.free_bytes(self.directory)
-        print(f"📦 {len(planned):,} files to download, {format_size(planned_bytes - self.downloaded_total)}; {format_size(free)} free on disk")
+        print(f"📦 {len(planned):,} files to download, {format_size(planned_bytes)}; {format_size(free)} free on disk")
         if self.left_out:
             print(f"💡 --max-total-size {format_size(options.max_total_size)} leaves out {self.left_out:,} more files")
         pbar = tqdm(total=len(planned), desc=f"Downloading @{self.username}", unit="file")

@@ -144,7 +144,7 @@ interface Media {
 | `pending` | wanted, not downloaded yet (the run stopped before its downloads finished) | yes |
 | `disabled` | that kind is switched off in `MEDIA_EXPORT_*` | once it is switched on |
 | `too_large` | over `--max-file-size` | once the limit allows it |
-| `total_limit` | would have taken the chat past `--max-total-size` | yes, within the limit |
+| `total_limit` | would have taken the run's downloads past `--max-total-size` | yes, within the next run's limit |
 | `failed` | the download failed after its retries | yes |
 | `unavailable` | the message was gone when its file was to be downloaded | no |
 
