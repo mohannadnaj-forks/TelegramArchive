@@ -7,6 +7,7 @@ unavailable {error}.
 from datetime import datetime
 
 STATE_FIELDS = ('state', 'setting', 'limit', 'error')
+GIVE_UP_AFTER_RUNS = 3
 
 
 def downloaded() -> dict:
@@ -52,11 +53,18 @@ def before_download(size: int, enabled: bool, setting: str, max_file_size: int) 
     return None
 
 
+def given_up(medium: dict) -> bool:
+    """A file whose download failed in GIVE_UP_AFTER_RUNS runs or more; only --retry-failed tries it again."""
+    return medium['state'] == 'failed' and medium.get('failures', 0) >= GIVE_UP_AFTER_RUNS
+
+
 def is_wanted(medium: dict, date: str, media_enabled: dict, max_file_size: int,
-              since: datetime | None, until: datetime | None) -> bool:
+              since: datetime | None, until: datetime | None, retry_failed: bool = False) -> bool:
     """Whether the downloading pass should fetch this file under the current settings; date is its item's."""
     state = medium['state']
     if medium['kind'] == 'contact' or state in ('downloaded', 'unavailable'):
+        return False
+    if given_up(medium) and not retry_failed:
         return False
     if state == 'disabled' and not media_enabled.get(medium['setting'].removeprefix('MEDIA_EXPORT_').lower(), False):
         return False

@@ -146,7 +146,7 @@ interface Media {
 | `disabled` | that kind is switched off in `MEDIA_EXPORT_*` | once it is switched on |
 | `too_large` | over `--max-file-size` | once the limit allows it |
 | `total_limit` | would have taken the run's downloads past `--max-total-size` | yes, within the next run's limit |
-| `failed` | the download failed after its retries | yes; after two failed runs, with one attempt per run |
+| `failed` | the download failed after its retries | yes; after two failed runs with one attempt per run; after three, only with `--retry-failed` |
 | `unavailable` | the message was gone when its file was to be downloaded | no |
 
 A file found on disk at `path` is `downloaded`, whatever the settings say.
@@ -160,7 +160,7 @@ interface Run {
   pid: number;
   started: Instant;
   updated?: Instant;    // written at every checkpoint
-  options?: { since: string | null; until: string | null; max_file_size: number; max_total_size: number; refresh: boolean };
+  options?: { since: string | null; until: string | null; max_file_size: number; max_total_size: number; refresh: boolean; retry_failed?: boolean };
   listed?: number;      // items listed by this run
   items_at_source?: number | null;  // Telegram's count of messages at the start of the run
   error?: string;       // status "failed"

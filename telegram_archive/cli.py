@@ -60,6 +60,7 @@ def build_parser(download_path: str | None) -> argparse.ArgumentParser:
     parser.add_argument('--max-file-size', type=parse_size, default='200M', metavar='SIZE', help="leave out files larger than this, e.g. 50M, 1G; 0 for no limit (default: 200M)")
     parser.add_argument('--max-total-size', type=parse_size, default='10G', metavar='SIZE', help="download at most this much in one run, leaving out the oldest files; the next run continues with them; 0 for no limit (default: 10G)")
     parser.add_argument('--refresh', action='store_true', help="re-read the whole history, refreshing edited messages, instead of only messages newer than the export")
+    parser.add_argument('--retry-failed', action='store_true', help="try again the files whose download failed in 3 runs or more, which are otherwise left alone")
     parser.add_argument('--viewer-only', action='store_true', help="rebuild index.html and data/ from the existing archive.db, without connecting to Telegram; chats may also be export directories")
     return parser
 
@@ -171,6 +172,7 @@ def run(argv: list, env: Mapping[str, str], client_factory=create_client, sessio
         max_file_size=args.max_file_size,
         max_total_size=args.max_total_size,
         refresh=args.refresh,
+        retry_failed=args.retry_failed,
         zone=zone,
     )
     if args.viewer_only:

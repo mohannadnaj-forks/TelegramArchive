@@ -53,7 +53,7 @@ class DownloadRetries(ExportRun):
         self.assertEqual(self.run_bot(download_errors={VIDEO: ['network'] * 5}), 0, self.output)
         self.assertEqual(self.attempts(VIDEO), [1])
         self.assertEqual(self.medium(250)['failures'], 3)
-        self.assertEqual(self.run_bot(), 0, self.output)
+        self.assertEqual(self.run_bot('--retry-failed'), 0, self.output)
         self.assertEqual(self.status_of(250)['state'], 'downloaded')
         self.assertNotIn('failures', self.medium(250))
 
@@ -63,6 +63,17 @@ class DownloadRetries(ExportRun):
         self.assertEqual(self.run_bot('--refresh', download_errors={VIDEO: ['network'] * 5}), 0, self.output)
         self.assertEqual(self.attempts(VIDEO), [1])
         self.assertEqual(self.medium(250)['failures'], 3)
+
+    def test_a_file_that_failed_in_three_runs_is_left_alone_unless_asked(self):
+        for _ in (1, 2, 3):
+            self.assertEqual(self.run_bot(download_errors={VIDEO: ['network'] * 5}), 0, self.output)
+        self.assertEqual(self.medium(250)['failures'], 3)
+        self.assertEqual(self.run_bot(download_errors={VIDEO: ['network'] * 5}), 0, self.output)
+        self.assertEqual(self.attempts(VIDEO), [])
+        self.assertIn('1 files failed in 3 runs or more', self.output)
+        self.assertEqual(self.run_bot('--retry-failed'), 0, self.output)
+        self.assertEqual(self.attempts(VIDEO), [1])
+        self.assertEqual(self.status_of(250)['state'], 'downloaded')
 
     def test_a_thumbnail_gets_two_attempts_and_the_file_stays_downloaded(self):
         self.assertEqual(self.run_bot(download_errors={'249.thumb.jpg': ['network'] * 5}), 0, self.output)

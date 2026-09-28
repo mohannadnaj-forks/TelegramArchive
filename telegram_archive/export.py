@@ -33,11 +33,13 @@ class RunOptions:
     max_file_size: int = 200 * 1024 ** 2
     max_total_size: int = 10 * 1024 ** 3
     refresh: bool = False
+    retry_failed: bool = False
     zone: tzinfo | None = None  # the zone dates are written in; None for the machine's
 
     def describe(self) -> dict:
         return {'since': self.since and self.since.isoformat(), 'until': self.until and self.until.isoformat(),
-                'max_file_size': self.max_file_size, 'max_total_size': self.max_total_size, 'refresh': self.refresh}
+                'max_file_size': self.max_file_size, 'max_total_size': self.max_total_size, 'refresh': self.refresh,
+                'retry_failed': self.retry_failed}
 
 
 class StopRequest:
@@ -108,6 +110,7 @@ class ChatExport:
         self.written_at = clock()
         self.downloaded_total = 0
         self.left_out = 0
+        self.given_up = 0
 
     def now(self) -> str:
         return datetime.now(self.options.zone).astimezone(self.options.zone).isoformat(timespec='seconds')
@@ -337,14 +340,16 @@ class ChatExport:
 
     def wanted(self, medium: dict, date: str) -> bool:
         return states.is_wanted(medium, date, self.settings.media, self.options.max_file_size,
-                                self.options.since, self.options.until)
+                                self.options.since, self.options.until, self.options.retry_failed)
 
     async def download_media(self) -> None:
         """Downloads the wanted files, newest first; --max-total-size bounds this run's downloads."""
         options = self.options
         planned, left_out, planned_bytes = [], [], 0
+        self.given_up = 0
         for item_id, position, date, medium in self.archive.media_not_downloaded():
             if not self.wanted(medium, date):
+                self.given_up += states.given_up(medium) and not options.retry_failed
                 continue
             size = medium.get('size') or 0
             if options.max_total_size and planned_bytes + size > options.max_total_size:
@@ -409,6 +414,9 @@ class ChatExport:
         print(f"✅ Export of @{self.username} is up to date: {count:,} messages, media {format_size(total)} ({summary})")
         if self.left_out:
             print(f"💡 {self.left_out} files were left out by --max-total-size ({format_size(self.options.max_total_size)}); run again with a larger value to fetch them.")
+        if self.given_up:
+            print(f"💡 {self.given_up} files failed in {states.GIVE_UP_AFTER_RUNS} runs or more and are not tried any more; "
+                  f"--retry-failed tries them again.")
         missing = sum(v['bytes'] for state, v in file_states.items() if state in ('total_limit', 'too_large'))
         if missing:
             print(f"📦 A complete export needs about {format_size(total + missing)} "
