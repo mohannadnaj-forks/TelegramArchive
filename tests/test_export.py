@@ -99,6 +99,11 @@ class StoppingDuringDownloads(ExportRun):
         self.assertEqual(len(first) + len(second), 83 + 34)
         self.assertEqual(len(self.calls('history')), 1)
 
+    def test_the_checkpoint_keeps_beating_while_files_download(self):
+        self.assertEqual(self.run_bot(count=30, checkpoint_seconds=0), 0, self.output)
+        self.assertEqual(self.file_states(), {'downloaded': 10 + 4})
+        self.assertNotIn('thread', self.output)
+
     def test_newest_files_are_downloaded_first(self):
         self.run_bot(interrupt_after_downloads=5)
         ids = [message_id_of(p) for p in self.downloaded_files()]

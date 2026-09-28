@@ -146,7 +146,8 @@ class Downloader:
         """One attempt; last_reason is the error behind a failure, which the library logs but does not raise."""
         started = last_shown = self.clock()
 
-        def progress(current: int, total: int) -> None:
+        # A coroutine: the library runs a plain function on a worker thread, where the archive's SQLite connection cannot be used.
+        async def progress(current: int, total: int) -> None:
             nonlocal last_shown
             now = self.clock()
             if now - last_shown >= PROGRESS_SECONDS:

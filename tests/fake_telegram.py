@@ -12,6 +12,9 @@ Chats (scenario['messages']):
 The fake follows Kurigram 2.2.26's get_chat_history as read from its source: newest first, max_id
 inclusive, offset_date returning messages older than it.
 """
+import asyncio
+import functools
+import inspect
 import json
 import os
 import signal
@@ -245,6 +248,13 @@ def make_fake_client(scenario: dict, kill=lambda: os._exit(9)) -> type:
                     media.file_id += ':expired'
         return message
 
+    async def report_progress(progress, *args) -> None:
+        # As Kurigram does: a coroutine runs on the loop, a plain function on a worker thread.
+        if inspect.iscoroutinefunction(progress):
+            await progress(*args)
+        else:
+            await asyncio.get_running_loop().run_in_executor(None, functools.partial(progress, *args))
+
     def fail(action: str):
         if action == 'network':
             raise ConnectionError('network went away')
@@ -332,7 +342,7 @@ def make_fake_client(scenario: dict, kill=lambda: os._exit(9)) -> type:
             with open(file_name, 'wb') as f:
                 f.write(b'x' * size)
             if progress is not None:
-                progress(size, size, *progress_args)
+                await report_progress(progress, size, size, *progress_args)
             counters['downloads'] += 1
             if counters['downloads'] == scenario.get('interrupt_after_downloads'):
                 signal.raise_signal(signal.SIGINT)

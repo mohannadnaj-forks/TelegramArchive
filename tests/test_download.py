@@ -1,5 +1,7 @@
 """The retry policy of one download (telegram_archive.download.Downloader)."""
 import asyncio
+import functools
+import inspect
 import logging
 import os
 import shutil
@@ -30,8 +32,13 @@ class ScriptedClient:
         if isinstance(step, Exception):
             raise step
         for current in (1, 2, 3):
-            if progress is not None:
-                progress(current * 1024 ** 2, 3 * 1024 ** 2, *progress_args)
+            if progress is None:
+                continue
+            args = (current * 1024 ** 2, 3 * 1024 ** 2, *progress_args)
+            if inspect.iscoroutinefunction(progress):
+                await progress(*args)
+            else:
+                await asyncio.get_running_loop().run_in_executor(None, functools.partial(progress, *args))
         with open(file_name, 'wb') as f:
             f.write(b'' if step == 'zero' else b'data')
 
