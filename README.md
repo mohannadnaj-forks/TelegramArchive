@@ -61,7 +61,7 @@ or directly:
 | `--max-file-size SIZE` | `200M` | Files larger than this are left out and marked as such in the archive. |
 | `--max-total-size SIZE` | `10G` | How much one run downloads at most. The oldest files beyond it are left out and marked as such; the next run continues with them, newest first. |
 | `--refresh` | off | Re-read the whole history. Without it, a run lists only messages it has not listed before, so edits to older messages are not picked up. |
-| `--retry-failed` | off | Try again the files whose download failed in three runs or more. Without it they are left alone, since Telegram refuses some files for good. |
+| `--retry-failed` | off | Try again now the files whose download failed in three runs or more. Without it such a file waits until a run made a week or more after its last failure: Telegram can refuse a file for days and serve it later. |
 
 Sizes take `K`, `M`, `G` suffixes; `0` means no limit. With make, pass these through `ARGS="..."`.
 

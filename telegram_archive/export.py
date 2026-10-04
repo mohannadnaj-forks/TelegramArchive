@@ -279,8 +279,9 @@ class ChatExport:
             states.set_state(medium, states.before_download(medium.get('size') or 0, self.settings.media[kind.setting],
                                                             media_setting_name(kind.setting), self.options.max_file_size)
                              or states.pending())
-            if known and known.get('failures'):
-                medium['failures'] = known['failures']
+            for field in ('failures', 'failed_at'):
+                if known and known.get(field):
+                    medium[field] = known[field]
         return medium
 
     def thumbnail_of(self, medium: dict, item: dict) -> str:
@@ -289,6 +290,7 @@ class ChatExport:
     def mark_downloaded(self, medium: dict, item: dict) -> None:
         states.set_state(medium, states.downloaded())
         medium.pop('failures', None)
+        medium.pop('failed_at', None)
         if not medium.get('size'):
             medium['size'] = os.path.getsize(self.full_path(medium['path']))
         thumbnail = self.thumbnail_of(medium, item)
@@ -313,6 +315,7 @@ class ChatExport:
             if not ok:
                 states.set_state(medium, states.failed(error))
                 medium['failures'] = medium.get('failures', 0) + 1
+                medium['failed_at'] = self.now()
                 return
             self.downloaded_total += size or os.path.getsize(path)
         thumbnail = self.full_path(self.thumbnail_of(medium, item))
@@ -340,7 +343,8 @@ class ChatExport:
 
     def wanted(self, medium: dict, date: str) -> bool:
         return states.is_wanted(medium, date, self.settings.media, self.options.max_file_size,
-                                self.options.since, self.options.until, self.options.retry_failed)
+                                self.options.since, self.options.until, self.options.retry_failed,
+                                datetime.fromisoformat(self.now()))
 
     async def download_media(self) -> None:
         """Downloads the wanted files, newest first; --max-total-size bounds this run's downloads."""
@@ -349,7 +353,7 @@ class ChatExport:
         self.given_up = 0
         for item_id, position, date, medium in self.archive.media_not_downloaded():
             if not self.wanted(medium, date):
-                self.given_up += states.given_up(medium) and not options.retry_failed
+                self.given_up += not options.retry_failed and states.given_up(medium, datetime.fromisoformat(self.now()))
                 continue
             size = medium.get('size') or 0
             if options.max_total_size and planned_bytes + size > options.max_total_size:
@@ -415,8 +419,8 @@ class ChatExport:
         if self.left_out:
             print(f"💡 {self.left_out} files were left out by --max-total-size ({format_size(self.options.max_total_size)}); run again with a larger value to fetch them.")
         if self.given_up:
-            print(f"💡 {self.given_up} files failed in {states.GIVE_UP_AFTER_RUNS} runs or more and are not tried any more; "
-                  f"--retry-failed tries them again.")
+            print(f"💡 {self.given_up} files failed in {states.GIVE_UP_AFTER_RUNS} runs or more; they are tried again "
+                  f"{states.RETRY_GIVEN_UP_AFTER.days} days after their last failure, or now with --retry-failed.")
         missing = sum(v['bytes'] for state, v in file_states.items() if state in ('total_limit', 'too_large'))
         if missing:
             print(f"📦 A complete export needs about {format_size(total + missing)} "

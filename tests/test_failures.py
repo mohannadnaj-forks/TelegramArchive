@@ -5,7 +5,9 @@ durations the program asked for.
 """
 import os
 import unittest
+from datetime import datetime, timedelta
 
+from telegram_archive.store import Archive
 from tests.support import ExportRun
 
 VIDEO = '250.mp4'  # the newest file of the basic chat, downloaded first
@@ -17,6 +19,16 @@ class DownloadRetries(ExportRun):
 
     def attempts(self, name: str) -> list:
         return [c['attempt'] for c in self.calls('download') if c['path'] == name]
+
+    def move_failure_back(self, message_id: int, days: int) -> None:
+        archive = Archive(self.export_dir())
+        try:
+            [medium] = archive.media_of(str(message_id))
+            medium['failed_at'] = (datetime.fromisoformat(medium['failed_at']) - timedelta(days=days)).isoformat(timespec='seconds')
+            archive.set_medium(str(message_id), 0, medium)
+            archive.commit()
+        finally:
+            archive.close()
 
     def test_a_flood_wait_is_waited_out_and_the_download_retried(self):
         self.assertEqual(self.run_bot(download_errors={VIDEO: ['flood:30']}), 0, self.output)
@@ -74,6 +86,18 @@ class DownloadRetries(ExportRun):
         self.assertEqual(self.run_bot('--retry-failed'), 0, self.output)
         self.assertEqual(self.attempts(VIDEO), [1])
         self.assertEqual(self.status_of(250)['state'], 'downloaded')
+
+    def test_a_file_left_alone_is_tried_again_a_week_after_its_last_failure(self):
+        for _ in (1, 2, 3):
+            self.assertEqual(self.run_bot(download_errors={VIDEO: ['network'] * 5}), 0, self.output)
+        self.move_failure_back(250, days=6)
+        self.assertEqual(self.run_bot(), 0, self.output)
+        self.assertEqual(self.attempts(VIDEO), [])
+        self.move_failure_back(250, days=2)
+        self.assertEqual(self.run_bot('--refresh'), 0, self.output)
+        self.assertEqual(self.attempts(VIDEO), [1])
+        self.assertEqual(self.status_of(250)['state'], 'downloaded')
+        self.assertNotIn('failed_at', self.medium(250))
 
     def test_a_thumbnail_gets_two_attempts_and_the_file_stays_downloaded(self):
         self.assertEqual(self.run_bot(download_errors={'249.thumb.jpg': ['network'] * 5}), 0, self.output)

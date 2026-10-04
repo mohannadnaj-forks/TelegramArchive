@@ -126,6 +126,7 @@ interface Media {
   limit?: number;       // too_large, total_limit: the limit in bytes
   error?: string;       // failed, unavailable
   failures?: number;    // failed: the runs in which its download failed; gone once it is downloaded
+  failed_at?: Instant;  // failed: when its download last failed; gone once it is downloaded
   size?: number;        // bytes, from Telegram; from the disk when Telegram gave none
   mime?: string;
   name?: string;        // the file's own name, when it has one
@@ -146,7 +147,7 @@ interface Media {
 | `disabled` | that kind is switched off in `MEDIA_EXPORT_*` | once it is switched on |
 | `too_large` | over `--max-file-size` | once the limit allows it |
 | `total_limit` | would have taken the run's downloads past `--max-total-size` | yes, within the next run's limit |
-| `failed` | the download failed after its retries | yes; after two failed runs with one attempt per run; after three, only with `--retry-failed` |
+| `failed` | the download failed after its retries | yes; after two failed runs with one attempt per run; after three, by a run 7 days or more after `failed_at`, or with `--retry-failed` |
 | `unavailable` | the message was gone when its file was to be downloaded | no |
 
 A file found on disk at `path` is `downloaded`, whatever the settings say.

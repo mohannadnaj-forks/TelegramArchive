@@ -4,10 +4,11 @@ The state's fields sit in the Media object itself, as docs/export-format.md desc
 downloaded, pending, disabled {setting}, too_large {limit}, total_limit {limit}, failed {error},
 unavailable {error}.
 """
-from datetime import datetime
+from datetime import datetime, timedelta
 
 STATE_FIELDS = ('state', 'setting', 'limit', 'error')
 GIVE_UP_AFTER_RUNS = 3
+RETRY_GIVEN_UP_AFTER = timedelta(days=7)
 
 
 def downloaded() -> dict:
@@ -53,18 +54,22 @@ def before_download(size: int, enabled: bool, setting: str, max_file_size: int) 
     return None
 
 
-def given_up(medium: dict) -> bool:
-    """A file whose download failed in GIVE_UP_AFTER_RUNS runs or more; only --retry-failed tries it again."""
-    return medium['state'] == 'failed' and medium.get('failures', 0) >= GIVE_UP_AFTER_RUNS
+def given_up(medium: dict, now: datetime) -> bool:
+    """A file whose download failed in GIVE_UP_AFTER_RUNS runs or more, the last time less than RETRY_GIVEN_UP_AFTER ago."""
+    if medium['state'] != 'failed' or medium.get('failures', 0) < GIVE_UP_AFTER_RUNS:
+        return False
+    failed_at = medium.get('failed_at')
+    return failed_at is not None and now - datetime.fromisoformat(failed_at) < RETRY_GIVEN_UP_AFTER
 
 
 def is_wanted(medium: dict, date: str, media_enabled: dict, max_file_size: int,
-              since: datetime | None, until: datetime | None, retry_failed: bool = False) -> bool:
+              since: datetime | None, until: datetime | None, retry_failed: bool = False,
+              now: datetime | None = None) -> bool:
     """Whether the downloading pass should fetch this file under the current settings; date is its item's."""
     state = medium['state']
     if medium['kind'] == 'contact' or state in ('downloaded', 'unavailable'):
         return False
-    if given_up(medium) and not retry_failed:
+    if not retry_failed and now is not None and given_up(medium, now):
         return False
     if state == 'disabled' and not media_enabled.get(medium['setting'].removeprefix('MEDIA_EXPORT_').lower(), False):
         return False
