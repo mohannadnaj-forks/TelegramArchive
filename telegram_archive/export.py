@@ -417,7 +417,7 @@ class ChatExport:
         total = self.archive.downloaded_bytes()
         print(f"✅ Export of @{self.username} is up to date: {count:,} messages, media {format_size(total)} ({summary})")
         if self.left_out:
-            print(f"💡 {self.left_out} files were left out by --max-total-size ({format_size(self.options.max_total_size)}); run again with a larger value to fetch them.")
+            print(f"💡 {self.left_out} files were left out by --max-total-size ({format_size(self.options.max_total_size)}); the next run continues with them.")
         if self.given_up:
             print(f"💡 {self.given_up} files failed in {states.GIVE_UP_AFTER_RUNS} runs or more; they are tried again "
                   f"{states.RETRY_GIVEN_UP_AFTER.days} days after their last failure, or now with --retry-failed.")
