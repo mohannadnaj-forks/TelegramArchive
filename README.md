@@ -1,58 +1,61 @@
-# Telegram-Archive
-### Export telegram account chats
- - [x] All private chats
- - [x] Specefic chats (username or ID)
- - [x] export channels that restrict saving content
- - [ ] All contacts in your account
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/logo-dark.svg">
+    <img src="docs/images/logo.svg" alt="hamstra" width="360">
+  </picture>
+</p>
 
-- #### All channels in your account
-    - [x] public channels
-    - [ ] private channels
-- #### All groups in your account
-    - [x] public groups
-    - [ ] private groups
+# hamstra-telegram
 
-### Export media in each chat
-You can choose to export and download each media type in `settings.env` (see [Settings](#settings)).
-```
-MEDIA_EXPORT_AUDIOS=false
-MEDIA_EXPORT_VIDEOS=false
-MEDIA_EXPORT_PHOTOS=true
-MEDIA_EXPORT_STICKERS=false
-MEDIA_EXPORT_ANIMATIONS=false
-MEDIA_EXPORT_DOCUMENTS=false
-MEDIA_EXPORT_VOICE_MESSAGES=false
-MEDIA_EXPORT_VIDEO_MESSAGES=false
-MEDIA_EXPORT_CONTACTS=false
-```
-And, for `--all`, which kinds of chat:
-```
-CHAT_EXPORT_PERSONALS=False
-CHAT_EXPORT_CHANNELS=False
-CHAT_EXPORT_GROUPS=False
-CHAT_EXPORT_SUPER_GROUPS=False
-CHAT_EXPORT_CONTACTS=True
-CHAT_EXPORT_BOTS=False
-```
+Archives Telegram chats to a folder on your disk: the messages in a SQLite file, the media files,
+and an HTML viewer that opens without a server. A run can be stopped and continued, and a later run
+adds what is new.
 
-### Export assholes chat
-- [ ] Export telegram chat for each T (time: minutes) to backup asshole people chat who delete chats both-side.
+*hamstra* is Swedish for "to hoard", literally "to hamster". This is the Telegram member of a small
+family of archivers that are meant to share one archive format.
 
-### Export format
-- [x] json
-- [x] html viewer
+> **This is a fork.** hamstra-telegram started as a fork of
+> [mo1ein/TelegramArchive](https://github.com/mo1ein/TelegramArchive) by Moein Halvaei (MIT, 2022)
+> and has been developed separately since September 2026. The command line, the settings and the
+> archive format are no longer compatible with the original. If you are looking for the original
+> project, follow the link. The licence and its copyright notice are unchanged.
+
+It is not an official Telegram application and is not affiliated with Telegram.
+
+## What it exports
+- Private chats, groups, channels and Saved Messages, named by username, `t.me` link or numeric id,
+  including channels that restrict saving content.
+- With `--all`, every chat of the kinds switched on in the settings.
+- Photos, videos, documents, audio, voice and video messages, stickers, animations and contact
+  cards, each kind switched on or off in the settings.
+
+## Install
+You need [uv](https://docs.astral.sh/uv/getting-started/installation/), which also fetches Python
+itself. The steps are the same on Windows, macOS and Linux.
+
+From a clone, so that `git pull` updates the command:
+```shell
+git clone https://github.com/mohannadnaj-forks/TelegramArchive hamstra-telegram
+cd hamstra-telegram
+uv tool install --python 3.13 --editable .
+```
+or without keeping a clone:
+```shell
+uv tool install --python 3.13 git+https://github.com/mohannadnaj-forks/TelegramArchive
+```
+If the shell then does not find `hamstra-telegram`, run `uv tool update-shell` and open a new
+terminal. `pipx install .` and `pip install .` work as well, on Python 3.10 or newer. From a clone
+with the dependencies installed, `python bot.py` and `python -m hamstra_telegram` run the same
+program without installing the command.
 
 ## Run
 ```shell
-make build-manual   # creates .venv and installs requirements
-make run CHATS="durov https://t.me/telegram" OUT=/path/to/exports
+hamstra-telegram durov https://t.me/telegram --output /path/to/exports
+hamstra-telegram me        # Saved Messages
+hamstra-telegram --all     # every chat allowed by CHAT_EXPORT_* in settings.env
 ```
-or directly:
-```shell
-.venv/bin/python bot.py durov https://t.me/telegram --output /path/to/exports
-.venv/bin/python bot.py me                 # Saved Messages
-.venv/bin/python bot.py --all              # every chat allowed by CHAT_EXPORT_* in settings.env
-```
+Chats are usernames, `t.me` links or numeric ids. Without `--output` the export goes to
+`DOWNLOAD_PATH` from the settings, or `./exports` in the folder you run from.
 
 | Option | Default | |
 |---|---|---|
@@ -62,19 +65,17 @@ or directly:
 | `--refresh` | off | Re-read the whole history. Without it, a run lists only messages it has not listed before, so edits to older messages are not picked up. |
 | `--retry-failed` | off | Try again now the files whose download failed in three runs or more. Without it such a file waits until a run made a week or more after its last failure: Telegram can refuse a file for days and serve it later. |
 
-Sizes take `K`, `M`, `G` suffixes; `0` means no limit. With make, pass these through `ARGS="..."`.
+Sizes take `K`, `M`, `G` suffixes; `0` means no limit.
 
 To change the viewer without re-running an export, rebuild it from the existing `archive.db`:
 ```shell
-.venv/bin/python bot.py --viewer-only durov --output /path/to/exports
-make viewer CHATS="durov" OUT=/path/to/exports
+hamstra-telegram --viewer-only durov --output /path/to/exports
 ```
 It also accepts an archive folder in place of a chat name and does not connect to Telegram.
-Chats are usernames, `t.me` links or numeric ids. Without `--output` the export goes to
-`DOWNLOAD_PATH` from the settings, or `./exports`.
 
 ### Settings
-The settings and the Telegram login are kept in one folder per user, the same from any copy of the code:
+The settings and the Telegram login are kept in one folder per user, the same from any copy of the code
+and for the installed command:
 
 | | |
 |---|---|
@@ -84,8 +85,10 @@ The settings and the Telegram login are kept in one folder per user, the same fr
 `--config-dir DIR` or the environment variable `HAMSTRA_TELEGRAM_CONFIG_DIR` names another folder.
 It holds:
 
-- `settings.env`: the API ID and hash, and the settings shown above. An environment variable of
-  the same name wins over a line in this file.
+- `settings.env`: the API ID and hash, which kinds of file a run downloads (`MEDIA_EXPORT_PHOTOS`,
+  `MEDIA_EXPORT_VIDEOS`, …), which kinds of chat `--all` exports (`CHAT_EXPORT_CHANNELS`, …), and a
+  few limits. The file lists every setting with a comment; a new one switches on photos and
+  stickers only. An environment variable of the same name wins over a line in this file.
 - `account.session`: the login. Anyone holding this file can act as your account.
 - `account.lock`: held while a run is using the login.
 
@@ -97,7 +100,7 @@ Only one run can use the login at a time; to export several chats, name them all
 
 #### Moving from `.env` and `.telegram/`
 Earlier versions kept both next to the code, and they are no longer read there. Move them once, from
-the folder holding `bot.py`:
+the folder holding `bot.py`, while no export is running:
 ```shell
 mkdir -p ~/.config/hamstra/telegram && chmod 700 ~/.config/hamstra/telegram
 mv .telegram/my_bot.session ~/.config/hamstra/telegram/account.session
@@ -111,6 +114,7 @@ Move-Item .env "$env:APPDATA\hamstra\telegram\settings.env"
 If another copy of the code has its own `.telegram/`, delete that copy's session file rather than
 keeping two.
 
+### The archive
 Each chat is archived to `telegram-<username>/` with `archive.db` (a SQLite file holding the
 messages, the state of every file and every run; [docs/export-format.md](docs/export-format.md)
 describes it), the files under `media/<month>/`, and an `index.html` viewer. The viewer opens straight from disk, no server needed; it reads
@@ -135,16 +139,20 @@ administrator PowerShell:
 ```powershell
 Set-ItemProperty HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem -Name LongPathsEnabled -Value 1
 ```
-When the program is started from a `.cmd` file, Windows asks `Terminate batch job (Y/N)?`
-after Ctrl-C. Progress is already saved by then, so either answer is fine.
+The installed `hamstra-telegram` is started without a `.cmd` file. If you wrap it in one, Windows
+asks `Terminate batch job (Y/N)?` after Ctrl-C; progress is already
+saved by then, so either answer is fine.
 
 ### Docker
-Set `CHATS` and `HOST_DOWNLOAD_PATH` in the environment, then `make build-up`. Log in once with
-`make run` first: the container uses the settings folder of the host, `~/.config/hamstra/telegram`
-unless `HAMSTRA_TELEGRAM_CONFIG_DIR` names another.
+The Dockerfile and compose file have not been built or run since the settings moved and the
+command was renamed; treat them as a starting point. Set `CHATS` and `HOST_DOWNLOAD_PATH` in the
+environment, then `make build-up`. Log in once on the host first: the container uses the host's
+settings folder, `~/.config/hamstra/telegram` unless `HAMSTRA_TELEGRAM_CONFIG_DIR` names another.
 
 ## Tests
 ```shell
+python -m venv .venv
+.venv/bin/python -m pip install -e .    # .venv\Scripts\python on Windows
 .venv/bin/python -m unittest
 ```
 The tests run the program against a fake Telegram client (`tests/fake_telegram.py`), with no network
