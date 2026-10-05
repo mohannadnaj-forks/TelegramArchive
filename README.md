@@ -13,7 +13,7 @@
     - [ ] private groups
 
 ### Export media in each chat
-You can choose to export and download each media type in `.env` file.
+You can choose to export and download each media type in `settings.env` (see [Settings](#settings)).
 ```
 MEDIA_EXPORT_AUDIOS=false
 MEDIA_EXPORT_VIDEOS=false
@@ -44,7 +44,6 @@ CHAT_EXPORT_BOTS=False
 
 ## Run
 ```shell
-make env            # creates .env; set API_ID and API_HASH from https://my.telegram.org
 make build-manual   # creates .venv and installs requirements
 make run CHATS="durov https://t.me/telegram" OUT=/path/to/exports
 ```
@@ -52,7 +51,7 @@ or directly:
 ```shell
 .venv/bin/python bot.py durov https://t.me/telegram --output /path/to/exports
 .venv/bin/python bot.py me                 # Saved Messages
-.venv/bin/python bot.py --all              # every chat allowed by CHAT_EXPORT_* in .env
+.venv/bin/python bot.py --all              # every chat allowed by CHAT_EXPORT_* in settings.env
 ```
 
 | Option | Default | |
@@ -72,12 +71,45 @@ make viewer CHATS="durov" OUT=/path/to/exports
 ```
 It also accepts an archive folder in place of a chat name and does not connect to Telegram.
 Chats are usernames, `t.me` links or numeric ids. Without `--output` the export goes to
-`DOWNLOAD_PATH` from `.env`, or `./exports`.
+`DOWNLOAD_PATH` from the settings, or `./exports`.
 
-The first run asks for your phone number, the login code Telegram sends you, and your
-two-step password if you have one. The resulting session is stored in `.telegram/`
-(git-ignored); anyone holding that file can act as your account.
-Only one run can use the session at a time; to export several chats, name them all in one command.
+### Settings
+The settings and the Telegram login are kept in one folder per user, the same from any copy of the code:
+
+| | |
+|---|---|
+| Windows | `%APPDATA%\hamstra\telegram` |
+| macOS, Linux | `~/.config/hamstra/telegram` (under `$XDG_CONFIG_HOME` when that is set) |
+
+`--config-dir DIR` or the environment variable `HAMSTRA_TELEGRAM_CONFIG_DIR` names another folder.
+It holds:
+
+- `settings.env`: the API ID and hash, and the settings shown above. An environment variable of
+  the same name wins over a line in this file.
+- `account.session`: the login. Anyone holding this file can act as your account.
+- `account.lock`: held while a run is using the login.
+
+The first run asks for the API ID and API hash, which you create at https://my.telegram.org under
+"API development tools", and writes `settings.env` with every setting in it. Then Telegram asks for
+your phone number, the login code it sends you, and your two-step password if you have one. A run
+that is not typed at a terminal does not ask; it stops and says where the two values go.
+Only one run can use the login at a time; to export several chats, name them all in one command.
+
+#### Moving from `.env` and `.telegram/`
+Earlier versions kept both next to the code, and they are no longer read there. Move them once, from
+the folder holding `bot.py`:
+```shell
+mkdir -p ~/.config/hamstra/telegram && chmod 700 ~/.config/hamstra/telegram
+mv .telegram/my_bot.session ~/.config/hamstra/telegram/account.session
+mv .env ~/.config/hamstra/telegram/settings.env
+```
+```powershell
+New-Item -ItemType Directory -Force "$env:APPDATA\hamstra\telegram" | Out-Null
+Move-Item .telegram\my_bot.session "$env:APPDATA\hamstra\telegram\account.session"
+Move-Item .env "$env:APPDATA\hamstra\telegram\settings.env"
+```
+If another copy of the code has its own `.telegram/`, delete that copy's session file rather than
+keeping two.
 
 Each chat is archived to `telegram-<username>/` with `archive.db` (a SQLite file holding the
 messages, the state of every file and every run; [docs/export-format.md](docs/export-format.md)
@@ -107,8 +139,9 @@ When the program is started from a `.cmd` file, Windows asks `Terminate batch jo
 after Ctrl-C. Progress is already saved by then, so either answer is fine.
 
 ### Docker
-Set `CHATS` and `HOST_DOWNLOAD_PATH` in `.env`, then `make build-up`. Log in once with
-`make run` first so that `.telegram/` holds a session for the container to use.
+Set `CHATS` and `HOST_DOWNLOAD_PATH` in the environment, then `make build-up`. Log in once with
+`make run` first: the container uses the settings folder of the host, `~/.config/hamstra/telegram`
+unless `HAMSTRA_TELEGRAM_CONFIG_DIR` names another.
 
 ## Tests
 ```shell
