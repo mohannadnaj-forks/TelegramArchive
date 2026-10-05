@@ -7,7 +7,7 @@ import os
 import unittest
 from datetime import datetime, timedelta
 
-from telegram_archive.store import Archive
+from hamstra_telegram.store import Archive
 from tests.support import ExportRun
 
 VIDEO = '250.mp4'  # the newest file of the basic chat, downloaded first

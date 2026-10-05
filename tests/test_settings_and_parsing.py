@@ -10,10 +10,10 @@ import unittest
 from datetime import datetime
 from unittest import mock
 
-from telegram_archive.cli import configure_streams, library_handler, parse_chat, parse_date, parse_size
-from telegram_archive.export import format_size, merge_ranges
-from telegram_archive.settings import Settings, ask_api_pair, default_config_dir, find_config_dir, read_settings, save_api_pair
-from telegram_archive.telegram import api_chat_id
+from hamstra_telegram.cli import configure_streams, library_handler, parse_chat, parse_date, parse_size
+from hamstra_telegram.export import format_size, merge_ranges
+from hamstra_telegram.settings import Settings, ask_api_pair, default_config_dir, find_config_dir, read_settings, save_api_pair
+from hamstra_telegram.telegram import api_chat_id
 
 
 class SettingsFromEnvironment(unittest.TestCase):

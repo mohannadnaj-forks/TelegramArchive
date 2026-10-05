@@ -6,7 +6,7 @@ fifth a video. test_end_to_end.py repeats the Ctrl-C and kill cases in a real su
 import os
 import unittest
 
-from telegram_archive.store import Archive
+from hamstra_telegram.store import Archive
 from tests.support import ExportRun, message_id_of
 
 

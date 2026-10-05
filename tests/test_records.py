@@ -9,7 +9,7 @@ import unittest
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
-from telegram_archive.records import instant, peer_id, vcard
+from hamstra_telegram.records import instant, peer_id, vcard
 from tests.fake_telegram import BASE_TIME
 from tests.support import ExportRun
 

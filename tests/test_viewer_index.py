@@ -1,7 +1,7 @@
-"""The viewer's month index and chunks, built from items directly (telegram_archive.viewer)."""
+"""The viewer's month index and chunks, built from items directly (hamstra_telegram.viewer)."""
 import unittest
 
-from telegram_archive.viewer import VIEWER_CHUNK_ITEMS, month_entry, search_text, split_chunks
+from hamstra_telegram.viewer import VIEWER_CHUNK_ITEMS, month_entry, search_text, split_chunks
 
 
 def item(i, day='2024-01-01', **fields):

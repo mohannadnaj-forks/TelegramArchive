@@ -1,16 +1,16 @@
-"""The retried rename (telegram_archive.files.replace)."""
+"""The retried rename (hamstra_telegram.files.replace)."""
 import os
 import shutil
 import tempfile
 import unittest
 from unittest import mock
 
-from telegram_archive import files
+from hamstra_telegram import files
 
 
 class Replace(unittest.TestCase):
     def setUp(self):
-        self.dir = tempfile.mkdtemp(prefix='telegram-archive-test-')
+        self.dir = tempfile.mkdtemp(prefix='hamstra-telegram-test-')
         self.source, self.destination = os.path.join(self.dir, 'a.tmp'), os.path.join(self.dir, 'a')
         open(self.source, 'w').close()
         self.waits = []

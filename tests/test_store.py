@@ -1,16 +1,16 @@
-"""The archive on disk (telegram_archive.store)."""
+"""The archive on disk (hamstra_telegram.store)."""
 import os
 import shutil
 import sqlite3
 import tempfile
 import unittest
 
-from telegram_archive.store import Archive, ArchiveVersionError, find_archive, is_export_dir, new_archive_dir, read_account
+from hamstra_telegram.store import Archive, ArchiveVersionError, find_archive, is_export_dir, new_archive_dir, read_account
 
 
 class Folders(unittest.TestCase):
     def setUp(self):
-        self.dir = tempfile.mkdtemp(prefix='telegram-archive-test-')
+        self.dir = tempfile.mkdtemp(prefix='hamstra-telegram-test-')
 
     def tearDown(self):
         shutil.rmtree(self.dir, ignore_errors=True)
@@ -40,7 +40,7 @@ class Folders(unittest.TestCase):
 
 class Saving(unittest.TestCase):
     def setUp(self):
-        self.dir = tempfile.mkdtemp(prefix='telegram-archive-test-')
+        self.dir = tempfile.mkdtemp(prefix='hamstra-telegram-test-')
         self.archive = Archive(self.dir)
 
     def tearDown(self):

@@ -101,7 +101,7 @@ class ChatExport:
         if self.archive.get('created') is None:
             self.archive.set('source', 'telegram')
             self.archive.set('created', self.now())
-        self.archive.set('generator', f'telegram-archive {__version__}')
+        self.archive.set('generator', f'hamstra-telegram {__version__}')
         self.existing = self.archive.count()
         self.listed = self.archive.get('extra', {}).get('telegram', {}).get('listed', [])
         self.run_state = {'status': 'running', 'stage': 'listing', 'pid': os.getpid(), 'started': self.now(),

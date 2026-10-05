@@ -1,6 +1,6 @@
 """Running the program against the fake client (see fake_telegram.py).
 
-ExportRun calls telegram_archive.cli.run in this process: fast, and what most tests use.
+ExportRun calls hamstra_telegram.cli.run in this process: fast, and what most tests use.
 SubprocessRun copies the program into a temporary directory and runs bot.py there, so that the real
 Ctrl-C, a real kill, the session lock between processes and the settings lookup behave as they do for a
 user; test_end_to_end.py and test_scale.py use it.
@@ -20,16 +20,16 @@ import unittest
 from datetime import timezone
 from contextlib import redirect_stderr, redirect_stdout
 
-from telegram_archive import cli
-from telegram_archive.settings import CONFIG_DIR_VARIABLE
-from telegram_archive.store import Archive
-from telegram_archive.telegram import SESSION_NAME
+from hamstra_telegram import cli
+from hamstra_telegram.settings import CONFIG_DIR_VARIABLE
+from hamstra_telegram.store import Archive
+from hamstra_telegram.telegram import SESSION_NAME
 from tests.fake_telegram import make_fake_client, recording_sleep
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TESTS = os.path.join(ROOT, 'tests')
 PROGRAM_FILES = ('bot.py', '_index.html')
-PROGRAM_PACKAGES = ('telegram_archive',)
+PROGRAM_PACKAGES = ('hamstra_telegram',)
 
 
 def copy_program(destination: str, source: str = ROOT) -> None:
@@ -69,7 +69,7 @@ class ExportChecks:
     chat = 'testchat'
 
     def setUp(self):
-        self.dir = tempfile.mkdtemp(prefix='telegram-archive-test-')
+        self.dir = tempfile.mkdtemp(prefix='hamstra-telegram-test-')
         self.out = os.path.join(self.dir, 'out')
         self.log = os.path.join(self.dir, 'calls.jsonl')
         self.config = os.path.join(self.dir, 'config')

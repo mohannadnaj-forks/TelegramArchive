@@ -1,4 +1,4 @@
-"""The retry policy of one download (telegram_archive.download.Downloader)."""
+"""The retry policy of one download (hamstra_telegram.download.Downloader)."""
 import asyncio
 import functools
 import inspect
@@ -10,8 +10,8 @@ import unittest
 
 from pyrogram.errors import FileReferenceExpired, FloodWait
 
-from telegram_archive.download import Downloader, LastWarning, LowDiskSpace
-from telegram_archive.settings import Settings
+from hamstra_telegram.download import Downloader, LastWarning, LowDiskSpace
+from hamstra_telegram.settings import Settings
 
 
 class ScriptedClient:
@@ -54,7 +54,7 @@ class NoProgress:
 
 class Downloads(unittest.TestCase):
     def setUp(self):
-        self.dir = tempfile.mkdtemp(prefix='telegram-archive-test-')
+        self.dir = tempfile.mkdtemp(prefix='hamstra-telegram-test-')
         self.destination = os.path.join(self.dir, 'video_1.mp4')
         self.waits = []
 

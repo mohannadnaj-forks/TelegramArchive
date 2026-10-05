@@ -1,8 +1,8 @@
-"""File names and paths (telegram_archive.media); a stored path is never recomputed, so these only apply to new files."""
+"""File names and paths (hamstra_telegram.media); a stored path is never recomputed, so these only apply to new files."""
 import unittest
 from types import SimpleNamespace
 
-from telegram_archive.media import MEDIA_KINDS, file_name, media_path, thumbnail_path
+from hamstra_telegram.media import MEDIA_KINDS, file_name, media_path, thumbnail_path
 
 KINDS = {kind.kind: kind for kind in MEDIA_KINDS}
 

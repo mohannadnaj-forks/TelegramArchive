@@ -1,8 +1,8 @@
-"""Which files the downloading pass fetches (telegram_archive.states)."""
+"""Which files the downloading pass fetches (hamstra_telegram.states)."""
 import unittest
 from datetime import datetime, timezone
 
-from telegram_archive import states
+from hamstra_telegram import states
 
 ENABLED = {'photos': True, 'videos': False}
 DATE = '2024-01-02T10:00:00+00:00'

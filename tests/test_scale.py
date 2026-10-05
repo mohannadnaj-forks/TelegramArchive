@@ -1,4 +1,4 @@
-"""A 200,000-message listing, to catch memory regressions. Slow: set TELEGRAM_ARCHIVE_SLOW_TESTS=1 to run it.
+"""A 200,000-message listing, to catch memory regressions. Slow: set HAMSTRA_TELEGRAM_SLOW_TESTS=1 to run it.
 
 Listing writes each record to archive.db as it goes, so memory should not grow with the export.
 """
@@ -10,7 +10,7 @@ from tests.support import SubprocessRun
 COUNT = 200_000
 
 
-@unittest.skipUnless(os.environ.get('TELEGRAM_ARCHIVE_SLOW_TESTS'), 'slow; set TELEGRAM_ARCHIVE_SLOW_TESTS=1')
+@unittest.skipUnless(os.environ.get('HAMSTRA_TELEGRAM_SLOW_TESTS'), 'slow; set HAMSTRA_TELEGRAM_SLOW_TESTS=1')
 class Scale(SubprocessRun):
     def test_listing_memory_does_not_grow_with_the_export(self):
         code = self.run_bot(count=COUNT, quiet=True, memory_every=COUNT // 10,
