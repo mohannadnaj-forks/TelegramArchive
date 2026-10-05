@@ -5,7 +5,7 @@ from pyrogram.enums import ChatType
 
 from .settings import Settings
 
-SESSION_NAME = 'my_bot'
+SESSION_NAME = 'account'
 
 
 class TelegramClient(Protocol):

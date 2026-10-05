@@ -1,6 +1,15 @@
-"""Settings read from the environment (and .env, which cli.main loads into it)."""
+"""Settings from settings.env in the per-user folder and from the environment, which wins."""
+import os
+import re
 from dataclasses import dataclass, field
+from importlib import resources
 from typing import Mapping
+
+from dotenv import dotenv_values, set_key
+
+CONFIG_DIR_VARIABLE = 'HAMSTRA_TELEGRAM_CONFIG_DIR'
+SETTINGS_FILE = 'settings.env'
+SETTINGS_TEMPLATE = 'settings.example.env'
 
 MEDIA_SETTINGS = ('audios', 'videos', 'photos', 'stickers', 'animations', 'documents', 'voice_messages',
                   'video_messages', 'contacts')
@@ -14,6 +23,54 @@ def str_to_bool(value) -> bool:
 
 def media_setting_name(key: str) -> str:
     return f'MEDIA_EXPORT_{key.upper()}'
+
+
+def default_config_dir(env: Mapping[str, str], windows: bool = os.name == 'nt') -> str:
+    if windows:
+        base = env.get('APPDATA') or os.path.join(os.path.expanduser('~'), 'AppData', 'Roaming')
+    else:
+        base = env.get('XDG_CONFIG_HOME', '')
+        if not os.path.isabs(base):
+            base = os.path.join(os.path.expanduser('~'), '.config')
+    return os.path.join(base, 'hamstra', 'telegram')
+
+
+def find_config_dir(option: str | None, env: Mapping[str, str]) -> str:
+    chosen = option or env.get(CONFIG_DIR_VARIABLE)
+    return os.path.abspath(os.path.expanduser(chosen)) if chosen else default_config_dir(env)
+
+
+def read_settings(config_dir: str, env: Mapping[str, str]) -> dict:
+    """The values of settings.env, each replaced by the environment's where it has the same name and is not empty."""
+    saved = {key: value for key, value in dotenv_values(os.path.join(config_dir, SETTINGS_FILE)).items() if value is not None}
+    return {**env, **{key: value for key, value in saved.items() if not env.get(key)}}
+
+
+def valid_api_pair(api_id: str | None, api_hash: str | None) -> bool:
+    return bool((api_id or '').strip().isdigit() and api_hash)
+
+
+def save_api_pair(config_dir: str, api_id: str, api_hash: str) -> str:
+    """Writes the pair to settings.env, created from the example with every setting when it is not there yet."""
+    os.makedirs(config_dir, mode=0o700, exist_ok=True)
+    path = os.path.join(config_dir, SETTINGS_FILE)
+    if not os.path.exists(path):
+        template = resources.files(__package__).joinpath(SETTINGS_TEMPLATE).read_text(encoding='utf-8')
+        with open(os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), 'w', encoding='utf-8', newline='\n') as f:
+            f.write(template)
+    set_key(path, 'API_ID', api_id, quote_mode='never', encoding='utf-8')
+    set_key(path, 'API_HASH', api_hash, quote_mode='never', encoding='utf-8')
+    return path
+
+
+def ask_api_pair(ask, say=print) -> tuple:
+    say("Telegram asks every application for an API ID and an API hash. They identify this program, not your account.\n"
+        "Create them once at https://my.telegram.org (API development tools) and paste them here.")
+    while not (api_id := ask("API ID: ").strip()).isdigit():
+        say("The API ID is a number.")
+    while not re.fullmatch(r'[0-9a-f]{32}', api_hash := ask("API hash: ").strip().lower()):
+        say("The API hash is 32 characters, digits and the letters a to f.")
+    return api_id, api_hash
 
 
 @dataclass(frozen=True)

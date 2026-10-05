@@ -2,13 +2,17 @@
 import argparse
 import io
 import logging
+import os
+import shutil
+import stat
+import tempfile
 import unittest
 from datetime import datetime
 from unittest import mock
 
 from telegram_archive.cli import configure_streams, library_handler, parse_chat, parse_date, parse_size
 from telegram_archive.export import format_size, merge_ranges
-from telegram_archive.settings import Settings
+from telegram_archive.settings import Settings, ask_api_pair, default_config_dir, find_config_dir, read_settings, save_api_pair
 from telegram_archive.telegram import api_chat_id
 
 
@@ -27,6 +31,73 @@ class SettingsFromEnvironment(unittest.TestCase):
         self.assertTrue(settings.chats['super_group'])
         self.assertFalse(settings.resume_enabled)
         self.assertEqual(settings.api_id, '12')
+
+
+class ConfigFolder(unittest.TestCase):
+    home = os.path.expanduser('~')
+
+    def test_the_default_follows_the_platform(self):
+        self.assertEqual(default_config_dir({'APPDATA': r'C:\Users\me\AppData\Roaming'}, windows=True),
+                         os.path.join(r'C:\Users\me\AppData\Roaming', 'hamstra', 'telegram'))
+        self.assertEqual(default_config_dir({}, windows=True),
+                         os.path.join(self.home, 'AppData', 'Roaming', 'hamstra', 'telegram'))
+        self.assertEqual(default_config_dir({}, windows=False), os.path.join(self.home, '.config', 'hamstra', 'telegram'))
+        absolute = os.path.abspath('xdg')
+        self.assertEqual(default_config_dir({'XDG_CONFIG_HOME': absolute}, windows=False),
+                         os.path.join(absolute, 'hamstra', 'telegram'))
+        self.assertEqual(default_config_dir({'XDG_CONFIG_HOME': 'relative'}, windows=False),
+                         os.path.join(self.home, '.config', 'hamstra', 'telegram'))
+
+    def test_the_option_wins_over_the_variable_which_wins_over_the_default(self):
+        env = {'HAMSTRA_TELEGRAM_CONFIG_DIR': os.path.join('~', 'from-env')}
+        self.assertEqual(find_config_dir('from-option', env), os.path.abspath('from-option'))
+        self.assertEqual(find_config_dir(None, env), os.path.join(self.home, 'from-env'))
+        self.assertEqual(find_config_dir(None, {}), default_config_dir({}))
+
+
+class SettingsFile(unittest.TestCase):
+    def setUp(self):
+        self.parent = tempfile.mkdtemp(prefix='hamstra-telegram-test-')
+        self.dir = os.path.join(self.parent, 'hamstra', 'telegram')
+        self.addCleanup(shutil.rmtree, self.parent, ignore_errors=True)
+
+    def test_a_first_save_writes_every_setting_with_the_pair_filled_in(self):
+        path = save_api_pair(self.dir, '12345', 'a' * 32)
+        self.assertEqual(path, os.path.join(self.dir, 'settings.env'))
+        saved = read_settings(self.dir, {})
+        self.assertEqual((saved['API_ID'], saved['API_HASH']), ('12345', 'a' * 32))
+        settings = Settings.from_env(saved)
+        self.assertEqual([kind for kind, on in settings.media.items() if on], ['photos', 'stickers'])
+        self.assertEqual(settings.min_free_disk_mb, 2048)
+        if os.name != 'nt':
+            self.assertEqual(stat.S_IMODE(os.stat(self.dir).st_mode), 0o700)
+            self.assertEqual(stat.S_IMODE(os.stat(path).st_mode), 0o600)
+
+    def test_a_later_save_keeps_the_other_settings(self):
+        os.makedirs(self.dir)
+        with open(os.path.join(self.dir, 'settings.env'), 'w', encoding='utf-8') as f:
+            f.write('# mine\nMEDIA_EXPORT_VIDEOS=True\nAPI_ID=\n')
+        save_api_pair(self.dir, '7', 'b' * 32)
+        with open(os.path.join(self.dir, 'settings.env'), encoding='utf-8') as f:
+            self.assertEqual(f.read(), f"# mine\nMEDIA_EXPORT_VIDEOS=True\nAPI_ID=7\nAPI_HASH={'b' * 32}\n")
+
+    def test_the_environment_wins_unless_its_value_is_empty(self):
+        os.makedirs(self.dir)
+        with open(os.path.join(self.dir, 'settings.env'), 'w', encoding='utf-8') as f:
+            f.write('API_ID=7\nCHECKPOINT_SECONDS=30\nDOWNLOAD_PATH=/saved\n')
+        merged = read_settings(self.dir, {'CHECKPOINT_SECONDS': '5', 'API_ID': '', 'OTHER': 'kept'})
+        self.assertEqual(merged, {'API_ID': '7', 'CHECKPOINT_SECONDS': '5', 'DOWNLOAD_PATH': '/saved', 'OTHER': 'kept'})
+
+    def test_a_missing_file_leaves_the_environment_as_it_is(self):
+        self.assertEqual(read_settings(self.dir, {'API_ID': '3'}), {'API_ID': '3'})
+        self.assertFalse(os.path.exists(self.dir))
+
+    def test_asking_repeats_until_the_answers_have_the_right_shape(self):
+        answers = iter(['abc', ' 12345 ', 'short', 'A1' * 16])
+        said = []
+        self.assertEqual(ask_api_pair(lambda prompt: next(answers), said.append), ('12345', 'a1' * 16))
+        self.assertIn('https://my.telegram.org', said[0])
+        self.assertEqual(len(said), 3)
 
 
 class Parsing(unittest.TestCase):

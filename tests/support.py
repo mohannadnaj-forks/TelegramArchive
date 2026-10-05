@@ -2,7 +2,7 @@
 
 ExportRun calls telegram_archive.cli.run in this process: fast, and what most tests use.
 SubprocessRun copies the program into a temporary directory and runs bot.py there, so that the real
-Ctrl-C, a real kill, the session lock between processes and the .env lookup behave as they do for a
+Ctrl-C, a real kill, the session lock between processes and the settings lookup behave as they do for a
 user; test_end_to_end.py and test_scale.py use it.
 
 Both record every call to the fake in a log, read back with calls().
@@ -21,6 +21,7 @@ from datetime import timezone
 from contextlib import redirect_stderr, redirect_stdout
 
 from telegram_archive import cli
+from telegram_archive.settings import CONFIG_DIR_VARIABLE
 from telegram_archive.store import Archive
 from telegram_archive.telegram import SESSION_NAME
 from tests.fake_telegram import make_fake_client, recording_sleep
@@ -42,7 +43,7 @@ def copy_program(destination: str, source: str = ROOT) -> None:
 
 def base_env(**settings) -> dict:
     env = {key: value for key, value in os.environ.items()
-           if not key.startswith(('MEDIA_EXPORT_', 'CHAT_EXPORT_', 'JSON_FILE_PAGE_SIZE'))}
+           if not key.startswith(('MEDIA_EXPORT_', 'CHAT_EXPORT_', 'XDG_CONFIG_HOME'))}
     env.update({'API_ID': '1', 'API_HASH': 'x', 'DOWNLOAD_PATH': '', 'MIN_FREE_DISK_MB': '0',
                 'PYTHONIOENCODING': 'utf-8', 'CHECKPOINT_SECONDS': '10',
                 'MEDIA_EXPORT_PHOTOS': 'True', 'MEDIA_EXPORT_VIDEOS': 'True'})
@@ -71,6 +72,10 @@ class ExportChecks:
         self.dir = tempfile.mkdtemp(prefix='telegram-archive-test-')
         self.out = os.path.join(self.dir, 'out')
         self.log = os.path.join(self.dir, 'calls.jsonl')
+        self.config = os.path.join(self.dir, 'config')
+
+    def env(self, checkpoint_seconds, settings) -> dict:
+        return base_env(**{'CHECKPOINT_SECONDS': checkpoint_seconds, CONFIG_DIR_VARIABLE: self.config, **(settings or {})})
 
     def tearDown(self):
         shutil.rmtree(self.dir, ignore_errors=True)
@@ -137,11 +142,11 @@ class ExportChecks:
 class ExportRun(ExportChecks, unittest.TestCase):
     """Runs the program in this process. The exit code is what a user's shell would see; 9 for a kill."""
 
-    def run_bot(self, *args, checkpoint_seconds=10, env=None, chat=None, clock=None, **scenario) -> int:
+    def run_bot(self, *args, checkpoint_seconds=10, env=None, chat=None, clock=None, ask=None, **scenario) -> int:
         open(self.log, 'w').close()
         scenario = {'count': 250, **scenario, 'log': self.log}
         client_class = make_fake_client(scenario, kill=simulated_kill)
-        settings = base_env(CHECKPOINT_SECONDS=checkpoint_seconds, **(env or {}))
+        settings = self.env(checkpoint_seconds, env)
         out, err = io.StringIO(), io.StringIO()
         root = logging.getLogger()
         handler, level = logging.StreamHandler(err), root.level
@@ -152,7 +157,7 @@ class ExportRun(ExportChecks, unittest.TestCase):
             with redirect_stdout(out), redirect_stderr(err):
                 cli.run(self.arguments(args, chat), settings,
                         client_factory=lambda s, session_dir: client_class(SESSION_NAME, workdir=session_dir),
-                        session_dir=os.path.join(self.dir, 'session'), sleep=recording_sleep(self.log), zone=timezone.utc,
+                        sleep=recording_sleep(self.log), zone=timezone.utc, ask=ask,
                         **({'clock': clock} if clock else {}))
         except SimulatedKill:
             code = 9
@@ -179,7 +184,7 @@ class SubprocessRun(ExportChecks, unittest.TestCase):
     def run_bot(self, *args, checkpoint_seconds=10, env=None, chat=None, **scenario) -> int:
         open(self.log, 'w').close()
         scenario = {'count': 250, **scenario, 'log': self.log}
-        settings = base_env(CHECKPOINT_SECONDS=checkpoint_seconds, **(env or {}))
+        settings = self.env(checkpoint_seconds, env)
         result = run_program(self.program, self.arguments(args, chat), scenario, settings)
         self.output = result.stdout + result.stderr
         return result.returncode

@@ -1,5 +1,5 @@
 """python bot.py in a subprocess, for what only a real process shows: Ctrl-C, a kill, the session lock
-between two processes, where the session lives, and running without a .env."""
+between two processes, where the session lives, and running without settings."""
 import os
 import shutil
 import subprocess
@@ -48,18 +48,39 @@ class Session(SubprocessRun):
         self.assertIn('API_ID and API_HASH are not set', self.output)
         self.assertNotIn('Traceback', self.output)
         self.assertFalse(os.path.exists(self.out))
-        self.assertFalse(os.path.exists(os.path.join(self.program, '.telegram')))
+        self.assertIn(os.path.join(self.config, 'settings.env'), self.output)
+        self.assertFalse(os.path.exists(self.config))
 
-    def test_the_session_lives_next_to_the_program(self):
+    def test_the_session_lives_in_the_config_folder_and_not_next_to_the_program(self):
+        before = sorted(os.listdir(self.program))
         self.assertEqual(self.run_bot(count=3), 0, self.output)
         [client] = self.calls('client')
-        self.assertEqual(client['name'], 'my_bot')
-        self.assertEqual(os.path.realpath(client['workdir']), os.path.realpath(os.path.join(self.program, '.telegram')))
+        self.assertEqual(client['name'], 'account')
+        self.assertEqual(os.path.realpath(client['workdir']), os.path.realpath(self.config))
+        self.assertEqual(sorted(name for name in os.listdir(self.program) if name != '__pycache__'), before)
+
+    def test_config_dir_on_the_command_line_wins_over_the_environment(self):
+        chosen = os.path.join(self.dir, 'chosen')
+        self.assertEqual(self.run_bot('--config-dir', chosen, count=3), 0, self.output)
+        [client] = self.calls('client')
+        self.assertEqual(os.path.realpath(client['workdir']), os.path.realpath(chosen))
+        self.assertFalse(os.path.exists(self.config))
+
+    def test_settings_come_from_the_config_folder_and_the_environment_wins(self):
+        os.makedirs(self.config)
+        with open(os.path.join(self.config, 'settings.env'), 'w', encoding='utf-8') as f:
+            f.write('API_ID=7\nAPI_HASH=saved\nMEDIA_EXPORT_PHOTOS=False\nMEDIA_EXPORT_VIDEOS=False\n')
+        with open(os.path.join(self.program, '.env'), 'w', encoding='utf-8') as f:
+            f.write('MEDIA_EXPORT_PHOTOS=True\n')
+        self.assertEqual(self.run_bot(count=30, env={'API_ID': '', 'API_HASH': '', 'MEDIA_EXPORT_PHOTOS': '',
+                                                     'MEDIA_EXPORT_VIDEOS': 'True'}), 0, self.output)
+        kinds = {medium['kind'] for item in self.archive()['items'] for medium in item.get('media', [])
+                 if medium['state'] == 'downloaded'}
+        self.assertEqual(kinds, {'video'})
 
     def test_a_second_run_on_the_same_login_stops_at_once(self):
-        lock_dir = os.path.join(self.program, '.telegram')
-        os.makedirs(lock_dir)
-        with open(os.path.join(lock_dir, 'my_bot.lock'), 'a+') as held:
+        os.makedirs(self.config)
+        with open(os.path.join(self.config, 'account.lock'), 'a+') as held:
             if os.name == 'nt':
                 import msvcrt
                 held.seek(0)
@@ -80,12 +101,12 @@ class Session(SubprocessRun):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('--viewer-only', result.stdout)
         self.assertEqual(self.run_bot(count=3), 0, self.output)
-        shutil.rmtree(os.path.join(self.program, '.telegram'))
+        shutil.rmtree(self.config)
         result = subprocess.run([sys.executable, bot, '--viewer-only', self.export_dir()], env=env,
                                 capture_output=True, text=True, encoding='utf-8')
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertTrue(os.path.exists(self.path('data', 'index.js')))
-        self.assertFalse(os.path.exists(os.path.join(self.program, '.telegram')))
+        self.assertFalse(os.path.exists(self.config))
 
 
 if __name__ == '__main__':
