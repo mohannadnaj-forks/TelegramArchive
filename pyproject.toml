@@ -1,0 +1,30 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "hamstra-telegram"
+dynamic = ["version"]
+description = "Archive Telegram chats to a folder: messages in SQLite, the media files and an offline HTML viewer."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.10"
+dependencies = [
+    "Kurigram==2.2.26",
+    "tgcrypto-pyrofork==1.2.8",
+    "python-dotenv>=1.0",
+    "tqdm-loggable>=0.2",
+]
+
+[project.scripts]
+hamstra-telegram = "hamstra_telegram.cli:main"
+
+[tool.hatch.version]
+path = "hamstra_telegram/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["hamstra_telegram"]
+
+[tool.hatch.build.targets.sdist]
+include = ["hamstra_telegram", "tests", "docs/*.md", "docs/*.svg", "bot.py", "README.md", "LICENSE"]

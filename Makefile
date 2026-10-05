@@ -1,6 +1,6 @@
-# Makefile for Telegram Archive
+# Makefile for hamstra-telegram
 
-PROJECT ?= telegram-archive
+PROJECT ?= hamstra-telegram
 COMPOSE_FILES       ?= docker-compose.yml
 COMPOSE_CMD  := $(shell command -v docker-compose 2> /dev/null || echo "docker compose")
 
@@ -23,7 +23,7 @@ NC     := \033[0m
 
 help:  ## Show this help
 
-	@echo "${GREEN}Telegram Archive Commands${NC}"
+	@echo "${GREEN}hamstra-telegram commands${NC}"
 	@echo ""
 	@echo "${YELLOW}Building:${NC}"
 	@echo "  make build           Build Docker images"
@@ -99,13 +99,12 @@ shell:  # Access container shell (specify service: make shell bot)
 
 build-manual:
 	python -m venv .venv
-	source ./.venv/bin/activate
-	pip install -r requirements.txt
+	.venv/bin/python -m pip install -e .
 
 # make run CHATS="durov t.me/telegram" OUT=/Volumes/Drive/telegram ARGS="--since 2024-01-01 --max-total-size 50G"
 run:
-	.venv/bin/python bot.py $(CHATS) $(if $(OUT),--output "$(OUT)") $(ARGS)
+	.venv/bin/hamstra-telegram $(CHATS) $(if $(OUT),--output "$(OUT)") $(ARGS)
 
 # make viewer CHATS="durov" OUT=/Volumes/Drive/telegram
 viewer:
-	.venv/bin/python bot.py --viewer-only $(CHATS) $(if $(OUT),--output "$(OUT)")
+	.venv/bin/hamstra-telegram --viewer-only $(CHATS) $(if $(OUT),--output "$(OUT)")

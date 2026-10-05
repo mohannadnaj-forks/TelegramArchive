@@ -56,7 +56,7 @@ class ViewerData(ViewerRun):
         self.assertEqual(self.search()[:2], [['1', '2024-01-01T01:00', 'message 1'], ['2', '2024-01-01T02:00', 'message 2']])
         self.assertEqual(self.search()[2], ['3', '2024-01-01T03:00', ''])
         self.assertEqual(self.search('2024-03')[-2], ['1499', '2024-03-03T11:00', 'message 1499'])
-        with open(os.path.join(ROOT, '_index.html'), encoding='utf-8') as template, \
+        with open(os.path.join(ROOT, 'hamstra_telegram', '_index.html'), encoding='utf-8') as template, \
                 open(self.path('index.html'), encoding='utf-8') as page:
             self.assertEqual(page.read(), template.read())
 

@@ -28,7 +28,7 @@ from tests.fake_telegram import make_fake_client, recording_sleep
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TESTS = os.path.join(ROOT, 'tests')
-PROGRAM_FILES = ('bot.py', '_index.html')
+PROGRAM_FILES = ('bot.py',)
 PROGRAM_PACKAGES = ('hamstra_telegram',)
 
 

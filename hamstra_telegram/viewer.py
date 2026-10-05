@@ -3,13 +3,14 @@ import itertools
 import json
 import logging
 import os
+from importlib import resources
 
 from . import files
 from .store import FORMAT, VERSION, Archive
 
 logger = logging.getLogger(__name__)
 
-TEMPLATE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '_index.html')
+TEMPLATE = '_index.html'
 VIEWER_CHUNK_ITEMS = 2000
 VIDEO_KINDS = ('video', 'round_video', 'animation')
 
@@ -77,14 +78,9 @@ def viewer_files(archive: Archive):
     yield 'index.js', f'archiveIndex({compact_js(index)});\n'
 
 
-def generate_index_html(export_path: str, archive: Archive, template_path: str = TEMPLATE) -> None:
+def generate_index_html(export_path: str, archive: Archive) -> None:
     """Writes index.html and its data/ folder for viewing the archive."""
-    try:
-        with open(template_path, 'r', encoding='utf-8') as f:
-            html_template = f.read()
-    except FileNotFoundError:
-        logger.error(f"❌ HTML template not found: {template_path}")
-        return
+    html_template = resources.files(__package__).joinpath(TEMPLATE).read_text(encoding='utf-8')
 
     data_dir = os.path.join(export_path, 'data')
     written = set()

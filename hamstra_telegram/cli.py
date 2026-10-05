@@ -1,4 +1,4 @@
-"""The command line: python bot.py <chats> [options]."""
+"""The command line: hamstra-telegram <chats> [options]."""
 import argparse
 import asyncio
 import contextlib
@@ -48,7 +48,7 @@ def parse_chat(value: str):
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Archive Telegram chats: messages in archive.db, media files and an HTML viewer.")
+    parser = argparse.ArgumentParser(prog='hamstra-telegram', description="Archive Telegram chats: messages in archive.db, media files and an HTML viewer.")
     parser.add_argument('chats', nargs='*', help="usernames, t.me links or numeric ids; 'me' is Saved Messages")
     parser.add_argument('--all', action='store_true', help="export every chat allowed by the CHAT_EXPORT_* settings")
     parser.add_argument('-o', '--output', help="directory to export into (default: DOWNLOAD_PATH from the settings, else ./exports)")
