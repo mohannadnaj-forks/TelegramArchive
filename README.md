@@ -35,13 +35,13 @@ itself. The steps are the same on Windows, macOS and Linux.
 
 From a clone, so that `git pull` updates the command:
 ```shell
-git clone https://github.com/mohannadnaj-forks/TelegramArchive hamstra-telegram
+git clone https://github.com/mohannadnaj-forks/hamstra-telegram
 cd hamstra-telegram
 uv tool install --python 3.13 --editable .
 ```
 or without keeping a clone:
 ```shell
-uv tool install --python 3.13 git+https://github.com/mohannadnaj-forks/TelegramArchive
+uv tool install --python 3.13 git+https://github.com/mohannadnaj-forks/hamstra-telegram
 ```
 If the shell then does not find `hamstra-telegram`, run `uv tool update-shell` and open a new
 terminal. `pipx install .` and `pip install .` work as well, on Python 3.10 or newer. From a clone

@@ -17,6 +17,9 @@ dependencies = [
     "tqdm-loggable>=0.2",
 ]
 
+[project.urls]
+Repository = "https://github.com/mohannadnaj-forks/hamstra-telegram"
+
 [project.scripts]
 hamstra-telegram = "hamstra_telegram.cli:main"
 
