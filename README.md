@@ -55,7 +55,11 @@ hamstra-telegram me        # Saved Messages
 hamstra-telegram --all     # every chat allowed by CHAT_EXPORT_* in settings.env
 ```
 Chats are usernames, `t.me` links or numeric ids. Without `--output` the export goes to
-`DOWNLOAD_PATH` from the settings, or `./exports` in the folder you run from.
+`DOWNLOAD_PATH` from the settings, or `./exports` in the folder you run from. The settings file and
+what the first run asks are described under [Settings](#settings).
+
+A large chat takes a while. For a first try, a small limit such as `--max-total-size 40M` shows the
+whole flow in a minute or two; the next run continues with the files it left out.
 
 | Option | Default | |
 |---|---|---|
@@ -117,7 +121,8 @@ keeping two.
 ### The archive
 Each chat is archived to `telegram-<username>/` with `archive.db` (a SQLite file holding the
 messages, the state of every file and every run; [docs/export-format.md](docs/export-format.md)
-describes it), the files under `media/<month>/`, and an `index.html` viewer. The viewer opens straight from disk, no server needed; it reads
+describes it), the files under `media/<month>/`, the chat's picture under `account/`, and an
+`index.html` viewer. The viewer opens straight from disk, no server needed; it reads
 the messages from `data/` (one file per month, plus an index and a search file) and loads
 only the months near what is on screen. Every run keeps the messages already exported, reads what is new
 (the whole chat on the first run or with `--refresh`), and downloads whatever the current
@@ -150,6 +155,7 @@ environment, then `make build-up`. Log in once on the host first: the container 
 settings folder, `~/.config/hamstra/telegram` unless `HAMSTRA_TELEGRAM_CONFIG_DIR` names another.
 
 ## Tests
+With Python 3.10 or newer (`python3` where `python` is not found):
 ```shell
 python -m venv .venv
 .venv/bin/python -m pip install -e .    # .venv\Scripts\python on Windows
